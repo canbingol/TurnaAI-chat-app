@@ -4,7 +4,7 @@ A simple Flask-based web application that provides a ChatGPT-like interface usin
 
 ## Features
 
-- Clean, modern interface with Turna theme colors (Turna blue, white, and Anka bird red)
+- Clean, modern interface with Turna theme colors 
 - Real-time chat interaction with Gemini AI
 - Responsive design for various screen sizes
 - Error handling for API failures and empty inputs
