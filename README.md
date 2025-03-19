@@ -104,3 +104,4 @@ In the TurnaAI project, **functional programming** paradigm will be applied to t
 
 ## Contact
 
+[Can Bingöl](https://www.linkedin.com/in/canbing%C3%B6l/)
