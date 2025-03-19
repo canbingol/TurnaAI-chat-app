@@ -1,6 +1,6 @@
 # TurnaAI - Chatbot with Turkish Language Model
 
-![TurnaAI Logo](Turna-project/static/turna-logo.svg)
+![TurnaAI Logo](web-app/static/turna-logo.svg)
 TurnaAI is a web and mobile application platform designed to develop an artificial intelligence model capable of intelligent and natural conversations in Turkish. This project is being developed as part of the Software Engineering Department at Firat University, Faculty of Technology.
 
 ## Project Summary
