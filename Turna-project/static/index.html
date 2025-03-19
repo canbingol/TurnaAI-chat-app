@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turna AI Chat</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sol Panel -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="/static/turna-logo.svg" alt="Turna AI" class="logo">
+                <h2>Turna AI</h2>
+            </div>
+            
+            <button class="new-chat-btn">
+                <i class="fas fa-plus"></i> Yeni Sohbet
+            </button>
+            
+            <!-- Sohbet modları -->
+            <div class="chat-modes">
+                <div class="mode-label">Sohbet Modu</div>
+                <div class="mode-options">
+                    <button class="mode-btn active" data-mode="normal">
+                        <i class="fas fa-comment"></i> Normal
+                    </button>
+                    <button class="mode-btn" data-mode="creative">
+                        <i class="fas fa-paint-brush"></i> Yaratıcı
+                    </button>
+                    <button class="mode-btn" data-mode="precise">
+                        <i class="fas fa-bullseye"></i> Kesin
+                    </button>
+                </div>
+            </div>
+            
+            <div class="conversations-list">
+                <!-- Geçmiş sohbetler burada listelenecek -->
+                <div class="conversation-item active">
+                    <i class="fas fa-comment-dots"></i>
+                    <span>Şu anki sohbet</span>
+                    <button class="delete-conversation"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="theme-toggle">
+                    <span class="theme-label">Tema:</span>
+                    <button id="theme-toggle-btn">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+                <button class="settings-btn">
+                    <i class="fas fa-cog"></i> Ayarlar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Ana İçerik -->
+        <div class="main-content">
+            <!-- Üst Başlık -->
+            <div class="top-bar">
+                <div class="menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <div class="conversation-title">Yeni Sohbet</div>
+                <div class="top-actions">
+                    <button id="export-btn" title="Sohbeti Dışa Aktar">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <div class="user-profile">
+                        <img src="/static/user-avatar.svg" alt="User" class="user-avatar">
+                        <div class="user-name">Kullanıcı</div>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sohbet Alanı -->
+            <div class="chat-container">
+                <div id="chat-messages">
+                    <div class="message bot">
+                        <div class="message-content">
+                            <p>Turna AI Chat'e hoş geldiniz! Size nasıl yardımcı olabilirim?</p>
+                            <p>İşte yapabileceğim bazı şeyler:</p>
+                            <ul>
+                                <li>Sorularınızı yanıtlayabilirim</li>
+                                <li>Yaratıcı içerik oluşturabilirim</li>
+                                <li>Metinleri düzenleyebilirim</li>
+                                <li>Kodlama yardımı sunabilirim</li>
+                            </ul>
+                        </div>
+                        <div class="message-actions">
+                            <button class="copy-btn" title="Kopyala"><i class="fas fa-copy"></i></button>
+                            <button class="thumbs-up-btn" title="Beğen"><i class="fas fa-thumbs-up"></i></button>
+                            <button class="thumbs-down-btn" title="Beğenme"><i class="fas fa-thumbs-down"></i></button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="suggestion-chips">
+                    <button class="suggestion-chip">Turna AI nedir?</button>
+                    <button class="suggestion-chip">Şiir yaz</button>
+                    <button class="suggestion-chip">Python öğrenmeye nasıl başlarım?</button>
+                    <button class="suggestion-chip">Türkiye'nin en güzel yerleri</button>
+                </div>
+                
+                <div class="input-area">
+                    <div class="input-container">
+                        <textarea id="user-input" placeholder="Bir şeyler sorun..."></textarea>
+                        <button id="mic-btn" title="Sesli Giriş">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button id="attach-btn" title="Dosya Ekle">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                    </div>
+                    <div class="input-buttons">
+                        <button id="clear-btn" title="Temizle">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <button id="send-button" title="Gönder">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Kullanıcı Profil Menüsü (varsayılan olarak gizli) -->
+        <div class="profile-menu">
+            <div class="profile-header">
+                <img src="/static/user-avatar.svg" alt="User" class="user-avatar-large">
+                <div class="profile-info">
+                    <div class="user-name-large">Kullanıcı</div>
+                    <div class="user-email">kullanici@ornek.com</div>
+                </div>
+            </div>
+            <div class="profile-options">
+                <a href="#" class="profile-option"><i class="fas fa-user"></i> Profil</a>
+                <a href="#" class="profile-option"><i class="fas fa-history"></i> Geçmiş</a>
+                <a href="#" class="profile-option"><i class="fas fa-sliders-h"></i> Tercihler</a>
+                <a href="#" class="profile-option"><i class="fas fa-question-circle"></i> Yardım</a>
+                <a href="#" class="profile-option"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a>
+            </div>
+        </div>
+        
+        <!-- Ayarlar Paneli -->
+        <div class="settings-panel">
+            <div class="settings-header">
+                <h3>Ayarlar</h3>
+                <button class="close-settings"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h4>Genel</h4>
+                    <div class="setting-item">
+                        <label>Dil</label>
+                        <select id="language-select">
+                            <option value="tr" selected>Türkçe</option>
+                            <option value="en">English</option>
+                            <option value="de">Deutsch</option>
+                            <option value="fr">Français</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Otomatik kaydırma</label>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-scroll-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>Görünüm</h4>
+                    <div class="setting-item">
+                        <label>Yazı boyutu</label>
+                        <select id="font-size-select">
+                            <option value="small">Küçük</option>
+                            <option value="medium" selected>Orta</option>
+                            <option value="large">Büyük</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Tema</label>
+                        <div class="theme-options">
+                            <button class="theme-option" data-theme="dark">Koyu</button>
+                            <button class="theme-option" data-theme="light">Açık</button>
+                            <button class="theme-option active" data-theme="purple">Mor</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>Bildirimler</h4>
+                    <div class="setting-item">
+                        <label>Ses bildirimleri</label>
+                        <label class="switch">
+                            <input type="checkbox" id="sound-notification-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dosya Ekleme Modal (varsayılan olarak gizli) -->
+        <div class="modal" id="file-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Dosya Ekle</h3>
+                    <button class="close-modal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Dosyalarınızı buraya sürükleyin veya</p>
+                        <button class="browse-btn">Dosya Seçin</button>
+                        <input type="file" id="file-input" style="display: none;">
+                    </div>
+                    <div class="file-list-area">
+                        <h4>Desteklenen Dosya Türleri</h4>
+                        <ul class="file-types">
+                            <li><i class="fas fa-file-pdf"></i> PDF dosyaları</li>
+                            <li><i class="fas fa-file-word"></i> Word dosyaları</li>
+                            <li><i class="fas fa-file-csv"></i> Excel dosyaları</li>
+                            <li><i class="fas fa-file-image"></i> Görsel dosyaları</li>
+                            <li><i class="fas fa-file-code"></i> Kod dosyaları</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="cancel-btn">İptal</button>
+                    <button class="upload-btn" disabled>Yükle</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Geri Bildirim Modal (varsayılan olarak gizli) -->
+        <div class="modal" id="feedback-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Geri Bildirim Gönder</h3>
+                    <button class="close-modal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="rating-area">
+                        <p>Bu cevabı nasıl buldunuz?</p>
+                        <div class="star-rating">
+                            <i class="far fa-star" data-rating="1"></i>
+                            <i class="far fa-star" data-rating="2"></i>
+                            <i class="far fa-star" data-rating="3"></i>
+                            <i class="far fa-star" data-rating="4"></i>
+                            <i class="far fa-star" data-rating="5"></i>
+                        </div>
+                    </div>
+                    <div class="feedback-text-area">
+                        <p>Ek yorumlarınız</p>
+                        <textarea placeholder="Deneyiminizle ilgili daha fazla ayrıntı paylaşın (isteğe bağlı)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="cancel-btn">İptal</button>
+                    <button class="submit-feedback-btn">Gönder</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Toast Bildirimleri İçin Konteyner -->
+        <div class="toast-container"></div>
+    </div>
+    
+    <!-- JavaScript Dosyaları -->
+    <script src="/static/translations.js"></script>
+    <script src="/static/script.js"></script>
+    <script src="/static/settings.js"></script>
+    <script src="/static/notifications.js"></script>
+    <script src="/static/theme.js"></script>
+</body>
+</html>
