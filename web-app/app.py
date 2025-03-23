@@ -9,7 +9,7 @@ load_dotenv()
 app = Flask(__name__, static_folder='static')
 
 # Initialize API client
-api_key = "Your api key"
+api_key = ""
 
 
 @app.route('/')

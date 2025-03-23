@@ -1,0 +1,216 @@
+11.7s 1 cuda
+222.5s 2 <ipython-input-18-ed49518103a9>:2: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+222.5s 3 checkpoint = torch.load('/kaggle/input/turna-54k/pytorch/default/1/model_checkpoint_adim_36000.pth')
+227.7s 4 Merhaba benim için ç
+5244.1s 5 Training loss: 1.751595455166746
+5244.1s 6 Validation loss: 1.7746239090208178
+5244.3s 7 <ipython-input-19-5dde04949f42>:2: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+5244.3s 8 checkpoint = torch.load('/kaggle/input/turna-54k/pytorch/default/1/model_checkpoint_adim_36000.pth')
+5456.6s 9 Ep 1 (Step 036100): Train loss 1.752, Val loss 1.762
+5664.1s 10 Ep 1 (Step 036200): Train loss 1.747, Val loss 1.762
+5871.5s 11 Ep 1 (Step 036300): Train loss 1.748, Val loss 1.764
+6078.8s 12 Ep 1 (Step 036400): Train loss 1.750, Val loss 1.762
+6286.3s 13 Ep 1 (Step 036500): Train loss 1.749, Val loss 1.762
+6493.7s 14 Ep 1 (Step 036600): Train loss 1.745, Val loss 1.762
+6701.1s 15 Ep 1 (Step 036700): Train loss 1.753, Val loss 1.764
+6908.5s 16 Ep 1 (Step 036800): Train loss 1.747, Val loss 1.763
+7115.9s 17 Ep 1 (Step 036900): Train loss 1.748, Val loss 1.762
+7323.3s 18 Ep 1 (Step 037000): Train loss 1.750, Val loss 1.762
+7530.8s 19 Ep 1 (Step 037100): Train loss 1.743, Val loss 1.762
+7738.2s 20 Ep 1 (Step 037200): Train loss 1.746, Val loss 1.761
+7945.7s 21 Ep 1 (Step 037300): Train loss 1.745, Val loss 1.760
+8153.1s 22 Ep 1 (Step 037400): Train loss 1.749, Val loss 1.762
+8360.4s 23 Ep 1 (Step 037500): Train loss 1.743, Val loss 1.759
+8567.8s 24 Ep 1 (Step 037600): Train loss 1.745, Val loss 1.759
+8775.1s 25 Ep 1 (Step 037700): Train loss 1.752, Val loss 1.758
+8982.5s 26 Ep 1 (Step 037800): Train loss 1.747, Val loss 1.758
+9189.8s 27 Ep 1 (Step 037900): Train loss 1.747, Val loss 1.759
+9397.1s 28 Ep 1 (Step 038000): Train loss 1.747, Val loss 1.761
+9604.5s 29 Ep 1 (Step 038100): Train loss 1.745, Val loss 1.760
+9811.8s 30 Ep 1 (Step 038200): Train loss 1.741, Val loss 1.757
+10019.2s 31 Ep 1 (Step 038300): Train loss 1.749, Val loss 1.759
+10226.6s 32 Ep 1 (Step 038400): Train loss 1.743, Val loss 1.759
+10433.9s 33 Ep 1 (Step 038500): Train loss 1.745, Val loss 1.758
+10641.3s 34 Ep 1 (Step 038600): Train loss 1.747, Val loss 1.757
+10848.7s 35 Ep 1 (Step 038700): Train loss 1.742, Val loss 1.755
+11056.1s 36 Ep 1 (Step 038800): Train loss 1.740, Val loss 1.757
+11263.5s 37 Ep 1 (Step 038900): Train loss 1.743, Val loss 1.756
+11470.9s 38 Ep 1 (Step 039000): Train loss 1.740, Val loss 1.756
+11678.3s 39 Ep 1 (Step 039100): Train loss 1.741, Val loss 1.758
+11885.7s 40 Ep 1 (Step 039200): Train loss 1.740, Val loss 1.756
+12093.0s 41 Ep 1 (Step 039300): Train loss 1.737, Val loss 1.753
+12300.4s 42 Ep 1 (Step 039400): Train loss 1.743, Val loss 1.756
+12507.7s 43 Ep 1 (Step 039500): Train loss 1.737, Val loss 1.757
+12715.1s 44 Ep 1 (Step 039600): Train loss 1.745, Val loss 1.756
+12922.2s 45 Ep 1 (Step 039700): Train loss 1.745, Val loss 1.754
+13129.5s 46 Ep 1 (Step 039800): Train loss 1.742, Val loss 1.755
+13336.9s 47 Ep 1 (Step 039900): Train loss 1.740, Val loss 1.755
+13544.2s 48 Ep 1 (Step 040000): Train loss 1.743, Val loss 1.755
+13751.5s 49 Ep 1 (Step 040100): Train loss 1.739, Val loss 1.754
+13958.8s 50 Ep 1 (Step 040200): Train loss 1.741, Val loss 1.751
+14166.1s 51 Ep 1 (Step 040300): Train loss 1.743, Val loss 1.756
+14373.4s 52 Ep 1 (Step 040400): Train loss 1.740, Val loss 1.753
+14580.7s 53 Ep 1 (Step 040500): Train loss 1.739, Val loss 1.753
+14788.0s 54 Ep 1 (Step 040600): Train loss 1.736, Val loss 1.752
+14995.3s 55 Ep 1 (Step 040700): Train loss 1.735, Val loss 1.752
+15202.7s 56 Ep 1 (Step 040800): Train loss 1.734, Val loss 1.753
+15410.2s 57 Ep 1 (Step 040900): Train loss 1.740, Val loss 1.751
+15617.6s 58 Ep 1 (Step 041000): Train loss 1.737, Val loss 1.751
+15825.0s 59 Ep 1 (Step 041100): Train loss 1.737, Val loss 1.752
+16032.5s 60 Ep 1 (Step 041200): Train loss 1.735, Val loss 1.751
+16239.9s 61 Ep 1 (Step 041300): Train loss 1.739, Val loss 1.752
+16447.3s 62 Ep 1 (Step 041400): Train loss 1.733, Val loss 1.750
+16654.8s 63 Ep 1 (Step 041500): Train loss 1.735, Val loss 1.751
+16862.2s 64 Ep 1 (Step 041600): Train loss 1.734, Val loss 1.751
+17069.7s 65 Ep 1 (Step 041700): Train loss 1.738, Val loss 1.749
+17277.1s 66 Ep 1 (Step 041800): Train loss 1.741, Val loss 1.751
+17484.5s 67 Ep 1 (Step 041900): Train loss 1.742, Val loss 1.751
+17691.9s 68 Ep 1 (Step 042000): Train loss 1.739, Val loss 1.750
+17899.4s 69 Ep 1 (Step 042100): Train loss 1.738, Val loss 1.749
+18106.8s 70 Ep 1 (Step 042200): Train loss 1.736, Val loss 1.750
+18314.2s 71 Ep 1 (Step 042300): Train loss 1.736, Val loss 1.749
+18521.6s 72 Ep 1 (Step 042400): Train loss 1.733, Val loss 1.749
+18729.0s 73 Ep 1 (Step 042500): Train loss 1.734, Val loss 1.747
+18936.5s 74 Ep 1 (Step 042600): Train loss 1.733, Val loss 1.750
+19143.9s 75 Ep 1 (Step 042700): Train loss 1.729, Val loss 1.745
+19351.3s 76 Ep 1 (Step 042800): Train loss 1.733, Val loss 1.747
+19558.7s 77 Ep 1 (Step 042900): Train loss 1.730, Val loss 1.747
+19766.2s 78 Ep 1 (Step 043000): Train loss 1.730, Val loss 1.746
+19973.6s 79 Ep 1 (Step 043100): Train loss 1.734, Val loss 1.747
+20181.0s 80 Ep 1 (Step 043200): Train loss 1.735, Val loss 1.746
+20388.4s 81 Ep 1 (Step 043300): Train loss 1.732, Val loss 1.746
+20595.9s 82 Ep 1 (Step 043400): Train loss 1.729, Val loss 1.747
+20803.3s 83 Ep 1 (Step 043500): Train loss 1.727, Val loss 1.745
+21010.7s 84 Ep 1 (Step 043600): Train loss 1.730, Val loss 1.745
+21218.2s 85 Ep 1 (Step 043700): Train loss 1.728, Val loss 1.745
+21425.6s 86 Ep 1 (Step 043800): Train loss 1.731, Val loss 1.743
+21633.0s 87 Ep 1 (Step 043900): Train loss 1.732, Val loss 1.748
+21840.5s 88 Ep 1 (Step 044000): Train loss 1.726, Val loss 1.744
+22047.9s 89 Ep 1 (Step 044100): Train loss 1.729, Val loss 1.745
+22255.3s 90 Ep 1 (Step 044200): Train loss 1.734, Val loss 1.746
+22462.8s 91 Ep 1 (Step 044300): Train loss 1.728, Val loss 1.744
+22670.2s 92 Ep 1 (Step 044400): Train loss 1.727, Val loss 1.745
+22877.7s 93 Ep 1 (Step 044500): Train loss 1.734, Val loss 1.745
+23085.1s 94 Ep 1 (Step 044600): Train loss 1.729, Val loss 1.743
+23292.6s 95 Ep 1 (Step 044700): Train loss 1.735, Val loss 1.744
+23500.0s 96 Ep 1 (Step 044800): Train loss 1.728, Val loss 1.742
+23707.4s 97 Ep 1 (Step 044900): Train loss 1.729, Val loss 1.743
+23914.9s 98 Ep 1 (Step 045000): Train loss 1.724, Val loss 1.743
+24122.3s 99 Ep 1 (Step 045100): Train loss 1.727, Val loss 1.742
+24329.8s 100 Ep 1 (Step 045200): Train loss 1.730, Val loss 1.743
+24537.2s 101 Ep 1 (Step 045300): Train loss 1.729, Val loss 1.742
+24744.6s 102 Ep 1 (Step 045400): Train loss 1.723, Val loss 1.740
+24952.1s 103 Ep 1 (Step 045500): Train loss 1.722, Val loss 1.740
+25159.5s 104 Ep 1 (Step 045600): Train loss 1.719, Val loss 1.738
+25367.0s 105 Ep 1 (Step 045700): Train loss 1.720, Val loss 1.739
+25574.4s 106 Ep 1 (Step 045800): Train loss 1.726, Val loss 1.742
+25781.8s 107 Ep 1 (Step 045900): Train loss 1.724, Val loss 1.740
+25989.3s 108 Ep 1 (Step 046000): Train loss 1.722, Val loss 1.741
+26196.7s 109 Ep 1 (Step 046100): Train loss 1.725, Val loss 1.740
+26404.2s 110 Ep 1 (Step 046200): Train loss 1.725, Val loss 1.737
+26611.6s 111 Ep 1 (Step 046300): Train loss 1.727, Val loss 1.740
+26819.0s 112 Ep 1 (Step 046400): Train loss 1.731, Val loss 1.739
+27026.4s 113 Ep 1 (Step 046500): Train loss 1.729, Val loss 1.739
+27233.9s 114 Ep 1 (Step 046600): Train loss 1.725, Val loss 1.738
+27441.3s 115 Ep 1 (Step 046700): Train loss 1.724, Val loss 1.739
+27648.7s 116 Ep 1 (Step 046800): Train loss 1.722, Val loss 1.740
+27856.2s 117 Ep 1 (Step 046900): Train loss 1.720, Val loss 1.738
+28063.6s 118 Ep 1 (Step 047000): Train loss 1.722, Val loss 1.738
+28270.9s 119 Ep 1 (Step 047100): Train loss 1.728, Val loss 1.738
+28478.3s 120 Ep 1 (Step 047200): Train loss 1.730, Val loss 1.739
+28685.5s 121 Ep 1 (Step 047300): Train loss 1.723, Val loss 1.739
+28892.9s 122 Ep 1 (Step 047400): Train loss 1.724, Val loss 1.737
+29100.2s 123 Ep 1 (Step 047500): Train loss 1.720, Val loss 1.739
+29307.6s 124 Ep 1 (Step 047600): Train loss 1.722, Val loss 1.739
+29515.0s 125 Ep 1 (Step 047700): Train loss 1.721, Val loss 1.736
+29722.3s 126 Ep 1 (Step 047800): Train loss 1.726, Val loss 1.738
+29929.6s 127 Ep 1 (Step 047900): Train loss 1.723, Val loss 1.736
+30137.0s 128 Ep 1 (Step 048000): Train loss 1.720, Val loss 1.736
+30344.3s 129 Ep 1 (Step 048100): Train loss 1.720, Val loss 1.737
+30551.7s 130 Ep 1 (Step 048200): Train loss 1.721, Val loss 1.736
+30758.9s 131 Ep 1 (Step 048300): Train loss 1.721, Val loss 1.737
+30966.2s 132 Ep 1 (Step 048400): Train loss 1.720, Val loss 1.735
+31173.5s 133 Ep 1 (Step 048500): Train loss 1.727, Val loss 1.736
+31380.8s 134 Ep 1 (Step 048600): Train loss 1.726, Val loss 1.740
+31588.1s 135 Ep 1 (Step 048700): Train loss 1.725, Val loss 1.735
+31795.4s 136 Ep 1 (Step 048800): Train loss 1.722, Val loss 1.735
+32002.7s 137 Ep 1 (Step 048900): Train loss 1.716, Val loss 1.734
+32210.0s 138 Ep 1 (Step 049000): Train loss 1.724, Val loss 1.736
+32417.2s 139 Ep 1 (Step 049100): Train loss 1.716, Val loss 1.735
+32624.5s 140 Ep 1 (Step 049200): Train loss 1.722, Val loss 1.735
+32831.8s 141 Ep 1 (Step 049300): Train loss 1.716, Val loss 1.733
+33039.1s 142 Ep 1 (Step 049400): Train loss 1.719, Val loss 1.733
+33246.5s 143 Ep 1 (Step 049500): Train loss 1.721, Val loss 1.735
+33454.0s 144 Ep 1 (Step 049600): Train loss 1.715, Val loss 1.733
+33661.4s 145 Ep 1 (Step 049700): Train loss 1.715, Val loss 1.733
+33868.8s 146 Ep 1 (Step 049800): Train loss 1.716, Val loss 1.733
+34076.2s 147 Ep 1 (Step 049900): Train loss 1.721, Val loss 1.733
+34283.6s 148 Ep 1 (Step 050000): Train loss 1.719, Val loss 1.734
+34490.9s 149 Ep 1 (Step 050100): Train loss 1.710, Val loss 1.731
+34698.2s 150 Ep 1 (Step 050200): Train loss 1.714, Val loss 1.732
+34905.5s 151 Ep 1 (Step 050300): Train loss 1.714, Val loss 1.731
+35112.8s 152 Ep 1 (Step 050400): Train loss 1.716, Val loss 1.731
+35320.1s 153 Ep 1 (Step 050500): Train loss 1.714, Val loss 1.732
+35527.4s 154 Ep 1 (Step 050600): Train loss 1.722, Val loss 1.733
+35734.7s 155 Ep 1 (Step 050700): Train loss 1.713, Val loss 1.731
+35942.0s 156 Ep 1 (Step 050800): Train loss 1.715, Val loss 1.732
+36149.3s 157 Ep 1 (Step 050900): Train loss 1.715, Val loss 1.730
+36356.6s 158 Ep 1 (Step 051000): Train loss 1.714, Val loss 1.728
+36563.9s 159 Ep 1 (Step 051100): Train loss 1.714, Val loss 1.730
+36771.1s 160 Ep 1 (Step 051200): Train loss 1.717, Val loss 1.731
+36978.5s 161 Ep 1 (Step 051300): Train loss 1.714, Val loss 1.730
+37185.8s 162 Ep 1 (Step 051400): Train loss 1.716, Val loss 1.732
+37393.1s 163 Ep 1 (Step 051500): Train loss 1.718, Val loss 1.730
+37600.4s 164 Ep 1 (Step 051600): Train loss 1.713, Val loss 1.730
+37807.7s 165 Ep 1 (Step 051700): Train loss 1.720, Val loss 1.732
+38014.9s 166 Ep 1 (Step 051800): Train loss 1.714, Val loss 1.731
+38222.2s 167 Ep 1 (Step 051900): Train loss 1.716, Val loss 1.732
+38429.5s 168 Ep 1 (Step 052000): Train loss 1.710, Val loss 1.730
+38636.9s 169 Ep 1 (Step 052100): Train loss 1.711, Val loss 1.729
+38844.2s 170 Ep 1 (Step 052200): Train loss 1.717, Val loss 1.730
+39051.4s 171 Ep 1 (Step 052300): Train loss 1.714, Val loss 1.729
+39258.8s 172 Ep 1 (Step 052400): Train loss 1.714, Val loss 1.730
+39466.1s 173 Ep 1 (Step 052500): Train loss 1.714, Val loss 1.729
+39673.4s 174 Ep 1 (Step 052600): Train loss 1.710, Val loss 1.727
+39880.7s 175 Ep 1 (Step 052700): Train loss 1.711, Val loss 1.728
+40088.0s 176 Ep 1 (Step 052800): Train loss 1.711, Val loss 1.728
+40295.3s 177 Ep 1 (Step 052900): Train loss 1.712, Val loss 1.726
+40502.6s 178 Ep 1 (Step 053000): Train loss 1.712, Val loss 1.728
+40709.9s 179 Ep 1 (Step 053100): Train loss 1.715, Val loss 1.729
+40917.2s 180 Ep 1 (Step 053200): Train loss 1.715, Val loss 1.725
+41124.6s 181 Ep 1 (Step 053300): Train loss 1.708, Val loss 1.727
+41331.9s 182 Ep 1 (Step 053400): Train loss 1.712, Val loss 1.727
+41539.0s 183 Ep 1 (Step 053500): Train loss 1.709, Val loss 1.729
+41746.1s 184 Ep 1 (Step 053600): Train loss 1.712, Val loss 1.728
+41953.3s 185 Ep 1 (Step 053700): Train loss 1.707, Val loss 1.727
+42160.4s 186 Ep 1 (Step 053800): Train loss 1.708, Val loss 1.726
+42367.5s 187 Ep 1 (Step 053900): Train loss 1.706, Val loss 1.726
+42416.4s 188 Belirli adımda model kaydedildi: model_checkpoint_adim_54000.pth
+42420.1s 189 Traceback (most recent call last):
+42420.1s 190 File "<string>", line 1, in <module>
+42420.1s 191 File "/usr/local/lib/python3.10/dist-packages/papermill/execute.py", line 131, in execute_notebook
+42420.1s 192 raise_for_execution_errors(nb, output_path)
+42420.1s 193 File "/usr/local/lib/python3.10/dist-packages/papermill/execute.py", line 251, in raise_for_execution_errors
+42420.1s 194 raise error
+42420.1s 195 papermill.exceptions.PapermillExecutionError:
+42420.1s 196 ---------------------------------------------------------------------------
+42420.1s 197 Exception encountered at "In [22]":
+42420.1s 198 ---------------------------------------------------------------------------
+42420.1s 199 TypeError                                 Traceback (most recent call last)
+42420.1s 200 <ipython-input-22-0b68ce608afb> in <cell line: 2>()
+42420.1s 201 1 num_epochs = 5  # Kaç epoch daha eğitmek istediğiniz
+42420.1s 202 ----> 2 continue_losses, continue_val_losses, continue_tokens_seen = continue_training(
+42420.1s 203 3     model, train_loader, val_loader, optimizer, device,
+42420.1s 204 4     num_epochs=num_epochs, eval_freq=100, eval_iter=500,
+42420.1s 205 5     start_context="Ben bir dil modeliyim", tokenizer=tokenizer,
+42420.1s 206 
+42420.1s 207 TypeError: cannot unpack non-iterable NoneType object
+42420.1s 208 
+42421.9s 209 /usr/local/lib/python3.10/dist-packages/traitlets/traitlets.py:2915: FutureWarning: --Exporter.preprocessors=["remove_papermill_header.RemovePapermillHeader"] for containers is deprecated in traitlets 5.0. You can pass `--Exporter.preprocessors item` ... multiple times to add items to a list.
+42421.9s 210 warn(
+42421.9s 211 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+42422.3s 212 [NbConvertApp] Writing 56781 bytes to __notebook__.ipynb
+42423.4s 213 /usr/local/lib/python3.10/dist-packages/traitlets/traitlets.py:2915: FutureWarning: --Exporter.preprocessors=["nbconvert.preprocessors.ExtractOutputPreprocessor"] for containers is deprecated in traitlets 5.0. You can pass `--Exporter.preprocessors item` ... multiple times to add items to a list.
+42423.4s 214 warn(
+42423.5s 215 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+42424.3s 216 [NbConvertApp] Writing 379718 bytes to __results__.html
