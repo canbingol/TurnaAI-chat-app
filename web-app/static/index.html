@@ -271,11 +271,389 @@
         <div class="toast-container"></div>
     </div>
     
+    <!-- index.html dosyasına eklenecek - login/signup modal -->
+<div class="modal" id="auth-modal">
+    <div class="modal-content auth-modal-content">
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login">Giriş</button>
+            <button class="auth-tab" data-tab="signup">Kayıt</button>
+        </div>
+        
+        <div class="auth-form-container">
+            <!-- Giriş Formu -->
+            <form id="login-form" class="auth-form active">
+                <div class="form-group">
+                    <label for="login-email">E-posta</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Şifre</label>
+                    <div class="password-input">
+                        <input type="password" id="login-password" required>
+                        <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                    </div>
+                </div>
+                <div class="form-options">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="remember-me">
+                        <span class="checkmark"></span>
+                        Beni hatırla
+                    </label>
+                    <a href="#" class="forgot-password">Şifremi unuttum</a>
+                </div>
+                <button type="submit" class="auth-submit-btn">Giriş Yap</button>
+            </form>
+            
+            <!-- Kayıt Formu -->
+            <form id="signup-form" class="auth-form">
+                <div class="form-group">
+                    <label for="signup-name">Ad Soyad</label>
+                    <input type="text" id="signup-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-email">E-posta</label>
+                    <input type="email" id="signup-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Şifre</label>
+                    <div class="password-input">
+                        <input type="password" id="signup-password" required>
+                        <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="signup-confirm-password">Şifre Tekrar</label>
+                    <div class="password-input">
+                        <input type="password" id="signup-confirm-password" required>
+                        <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                    </div>
+                </div>
+                <div class="form-options">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="terms-agree" required>
+                        <span class="checkmark"></span>
+                        <a href="#" class="terms-link">Kullanım şartlarını</a> kabul ediyorum
+                    </label>
+                </div>
+                <button type="submit" class="auth-submit-btn">Kayıt Ol</button>
+            </form>
+        </div>
+        
+        <div class="auth-separator">
+            <span>veya</span>
+        </div>
+        
+        <div class="social-login">
+            <button class="social-btn google-btn">
+                <i class="fab fa-google"></i>
+                Google ile devam et
+            </button>
+            <button class="social-btn facebook-btn">
+                <i class="fab fa-facebook-f"></i>
+                Facebook ile devam et
+            </button>
+        </div>
+        
+        <button class="guest-login-btn">
+            <i class="fas fa-user-secret"></i>
+            Misafir olarak devam et
+        </button>
+    </div>
+</div>
+
+<!-- Profil Kartları -->
+<div class="profile-card-overlay" id="profile-card-overlay">
+    <!-- Profil Kartı -->
+    <div class="profile-card" id="profile-card">
+        <div class="profile-card-header">
+            <h3>Profil Bilgileri</h3>
+            <button class="close-profile-card"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="profile-card-content">
+            <div class="profile-image-container">
+                <img src="/static/user-avatar.svg" alt="Profil Fotoğrafı" class="profile-image">
+                <button class="change-profile-photo"><i class="fas fa-camera"></i></button>
+            </div>
+            <form id="profile-form">
+                <div class="form-group">
+                    <label for="profile-name">Ad Soyad</label>
+                    <input type="text" id="profile-name" value="Kullanıcı">
+                </div>
+                <div class="form-group">
+                    <label for="profile-email">E-posta</label>
+                    <input type="email" id="profile-email" value="kullanici@ornek.com" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="profile-bio">Hakkımda</label>
+                    <textarea id="profile-bio" rows="3" placeholder="Kendiniz hakkında kısa bir bilgi..."></textarea>
+                </div>
+                <button type="submit" class="profile-save-btn">Değişiklikleri Kaydet</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Geçmiş Kartı -->
+    <div class="profile-card" id="history-card">
+        <div class="profile-card-header">
+            <h3>Sohbet Geçmişi</h3>
+            <button class="close-profile-card"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="profile-card-content">
+            <div class="history-search">
+                <div class="search-container">
+                    <input type="text" placeholder="Geçmiş sohbetlerde ara...">
+                    <button class="search-btn"><i class="fas fa-search"></i></button>
+                </div>
+                <div class="history-filter">
+                    <label for="history-sort">Sırala:</label>
+                    <select id="history-sort">
+                        <option value="newest">En yeni</option>
+                        <option value="oldest">En eski</option>
+                    </select>
+                </div>
+            </div>
+            <div class="history-list">
+                <div class="history-item">
+                    <div class="history-item-header">
+                        <h4>Python öğrenmeye nasıl başlarım?</h4>
+                        <span class="history-date">2 saat önce</span>
+                    </div>
+                    <p class="history-preview">Python öğrenmek için öncelikle temel programlama kavramlarını anlamanız ...</p>
+                    <div class="history-actions">
+                        <button class="history-continue"><i class="fas fa-play"></i> Devam Et</button>
+                        <button class="history-delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div class="history-item">
+                    <div class="history-item-header">
+                        <h4>Türkiye'nin en güzel yerleri</h4>
+                        <span class="history-date">Dün</span>
+                    </div>
+                    <p class="history-preview">Türkiye, doğal güzellikleri ve tarihi zenginlikleriyle dünyanın en ...</p>
+                    <div class="history-actions">
+                        <button class="history-continue"><i class="fas fa-play"></i> Devam Et</button>
+                        <button class="history-delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div class="history-item">
+                    <div class="history-item-header">
+                        <h4>Şiir yazma</h4>
+                        <span class="history-date">3 gün önce</span>
+                    </div>
+                    <p class="history-preview">İşte yazdığım şiir: Gün batımında kızıl ufuk çizgisinde beklerken ...</p>
+                    <div class="history-actions">
+                        <button class="history-continue"><i class="fas fa-play"></i> Devam Et</button>
+                        <button class="history-delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="history-pagination">
+                <button class="pagination-btn"><i class="fas fa-chevron-left"></i></button>
+                <button class="pagination-btn active">1</button>
+                <button class="pagination-btn">2</button>
+                <button class="pagination-btn">3</button>
+                <button class="pagination-btn"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tercihler Kartı -->
+    <div class="profile-card" id="preferences-card">
+        <div class="profile-card-header">
+            <h3>Tercihler</h3>
+            <button class="close-profile-card"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="profile-card-content">
+            <div class="preferences-section">
+                <h4>Arayüz Ayarları</h4>
+                <div class="preference-item">
+                    <label for="pref-theme">Tema</label>
+                    <div class="theme-options">
+                        <button class="theme-option active" data-theme="purple">Mor</button>
+                        <button class="theme-option" data-theme="dark">Koyu</button>
+                        <button class="theme-option" data-theme="light">Açık</button>
+                    </div>
+                </div>
+                <div class="preference-item">
+                    <label for="pref-font-size">Yazı Boyutu</label>
+                    <select id="pref-font-size">
+                        <option value="small">Küçük</option>
+                        <option value="medium" selected>Orta</option>
+                        <option value="large">Büyük</option>
+                    </select>
+                </div>
+                <div class="preference-item">
+                    <label for="pref-language">Dil</label>
+                    <select id="pref-language">
+                        <option value="tr" selected>Türkçe</option>
+                        <option value="en">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Français</option>
+                    </select>
+                </div>
+            </div>
+            <div class="preferences-section">
+                <h4>Bildirim Ayarları</h4>
+                <div class="preference-item">
+                    <label>Sesli Bildirimler</label>
+                    <label class="switch">
+                        <input type="checkbox" id="pref-sounds" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="preference-item">
+                    <label>E-posta Bildirimleri</label>
+                    <label class="switch">
+                        <input type="checkbox" id="pref-email-notifications">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="preferences-section">
+                <h4>Gizlilik Ayarları</h4>
+                <div class="preference-item">
+                    <label>Sohbet Geçmişini Kaydet</label>
+                    <label class="switch">
+                        <input type="checkbox" id="pref-save-history" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="preference-item">
+                    <label>Kullanım İstatistiklerini Paylaş</label>
+                    <label class="switch">
+                        <input type="checkbox" id="pref-usage-stats" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            <button class="preferences-save-btn">Değişiklikleri Kaydet</button>
+        </div>
+    </div>
+    
+    <!-- Yardım Kartı -->
+    <div class="profile-card" id="help-card">
+        <div class="profile-card-header">
+            <h3>Yardım</h3>
+            <button class="close-profile-card"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="profile-card-content">
+            <div class="help-search">
+                <div class="search-container">
+                    <input type="text" placeholder="Nasıl yardımcı olabiliriz?">
+                    <button class="search-btn"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="help-tabs">
+                <button class="help-tab active" data-tab="faqs">Sık Sorulan Sorular</button>
+                <button class="help-tab" data-tab="guides">Kullanım Kılavuzu</button>
+                <button class="help-tab" data-tab="contact">İletişim</button>
+            </div>
+            
+            <!-- SSS İçeriği -->
+            <div class="help-content active" id="faqs-content">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h4>Turna AI nasıl çalışır?</h4>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Turna AI, Google'ın Gemini AI teknolojisini kullanan bir yapay zeka sohbet uygulamasıdır. Sorularınızı yanıtlar, yaratıcı içerik oluşturur ve kodlama yardımı sunabilir.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h4>Sohbet geçmişimi nasıl silebilirim?</h4>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sohbet geçmişinizi silmek için sol menüdeki konuşmalarınızın yanındaki çarpı işaretine tıklayabilir veya Geçmiş kartındaki Sil butonunu kullanabilirsiniz.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h4>Sohbeti dosya olarak nasıl indirebilirim?</h4>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Üst menüde yer alan indirme simgesine tıklayarak mevcut sohbeti JSON formatında dışa aktarabilirsiniz.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kılavuz İçeriği -->
+            <div class="help-content" id="guides-content">
+                <div class="guide-item">
+                    <h4>Başlarken</h4>
+                    <p>Turna AI sohbet uygulamasını kullanmaya başlamak için bir hesap oluşturabilir veya misafir olarak devam edebilirsiniz. Sağ üst köşedeki metin kutusuna sorularınızı yazarak sohbete başlayabilirsiniz.</p>
+                </div>
+                <div class="guide-item">
+                    <h4>Sohbet Modları</h4>
+                    <p>Sol menüde üç farklı sohbet modu bulunmaktadır:</p>
+                    <ul>
+                        <li><strong>Normal:</strong> Genel sorular için dengeli yanıtlar</li>
+                        <li><strong>Yaratıcı:</strong> Daha özgün ve yaratıcı içerik</li>
+                        <li><strong>Kesin:</strong> Daha kısa ve net cevaplar</li>
+                    </ul>
+                </div>
+                <div class="guide-item">
+                    <h4>Dosya Yükleme</h4>
+                    <p>Ataç simgesine tıklayarak PDF, Word, Excel ve görsel dosyaları yükleyebilir ve bu dosyalar hakkında sorular sorabilirsiniz.</p>
+                </div>
+            </div>
+            
+            <!-- İletişim İçeriği -->
+            <div class="help-content" id="contact-content">
+                <div class="contact-form">
+                    <div class="form-group">
+                        <label for="contact-name">Adınız</label>
+                        <input type="text" id="contact-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-email">E-posta</label>
+                        <input type="email" id="contact-email">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-subject">Konu</label>
+                        <select id="contact-subject">
+                            <option value="question">Soru</option>
+                            <option value="feedback">Geri Bildirim</option>
+                            <option value="problem">Teknik Sorun</option>
+                            <option value="other">Diğer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-message">Mesajınız</label>
+                        <textarea id="contact-message" rows="4"></textarea>
+                    </div>
+                    <button type="submit" class="contact-submit-btn">Gönder</button>
+                </div>
+                <div class="contact-info">
+                    <div class="contact-method">
+                        <i class="fas fa-envelope"></i>
+                        <span>destek@turnaai.com</span>
+                    </div>
+                    <div class="contact-method">
+                        <i class="fas fa-phone-alt"></i>
+                        <span>+90 212 123 4567</span>
+                    </div>
+                    <div class="contact-social">
+                        <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- JavaScript Dosyaları -->
     <script src="/static/translations.js"></script>
     <script src="/static/script.js"></script>
     <script src="/static/settings.js"></script>
     <script src="/static/notifications.js"></script>
     <script src="/static/theme.js"></script>
+    <script src="/static/auth-profile.js"></script>
 </body>
 </html>
