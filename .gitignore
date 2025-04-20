@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Sanal ortam
+.venv/
+env/
+*.env
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Derlenmiş statik dosyalar
+static/dist/

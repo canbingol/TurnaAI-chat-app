@@ -22,17 +22,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const suggestionChips = document.querySelectorAll('.suggestion-chip');
     const conversationsList = document.querySelector('.conversations-list');
     const themeOptions = document.querySelectorAll('.theme-option');
+    const userNameDisplay = document.querySelector('.user-name');
+    const userEmailDisplay = document.querySelector('.user-email');
+    const logoutBtn = document.querySelector('.profile-options [href="#"]:last-child');
 
     // Uygulama durumu
     let currentTheme = 'purple';
     let darkMode = true;
     let currentMode = 'normal';
     let isRecording = false;
+    let isAuthenticated = false;
+    let currentUser = null;
 
     // Konuşma geçmişi
     let conversations = [];
     let currentConversation = {
-        id: Date.now(),
+        id: null,
         title: "Yeni Sohbet",
         messages: []
     };
@@ -74,6 +79,402 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
             toast.remove();
         }, 3000);
+    }
+
+    // Kullanıcı kimlik doğrulama durumunu kontrol et
+    async function checkAuthStatus() {
+        try {
+            const response = await fetch('/api/user');
+
+            if (response.ok) {
+                const data = await response.json();
+                currentUser = data.user;
+                isAuthenticated = true;
+
+                // Kullanıcı bilgilerini güncelle
+                updateUserInfo(currentUser);
+
+                // Sohbetleri yükle
+                loadConversationsFromDB();
+
+                return true;
+            } else {
+                isAuthenticated = false;
+                currentUser = null;
+                return false;
+            }
+        } catch (error) {
+            console.error('Kimlik doğrulama kontrolü hatası:', error);
+            isAuthenticated = false;
+            currentUser = null;
+            return false;
+        }
+    }
+
+    // Kullanıcı bilgilerini güncelle
+    function updateUserInfo(user) {
+        if (userNameDisplay) {
+            userNameDisplay.textContent = user.name;
+        }
+
+        if (userEmailDisplay) {
+            userEmailDisplay.textContent = user.email;
+        }
+
+        // Profil menüsündeki kullanıcı adını da güncelle
+        const userNameLarge = document.querySelector('.user-name-large');
+        if (userNameLarge) {
+            userNameLarge.textContent = user.name;
+        }
+
+        const userEmailElement = document.querySelector('.user-email');
+        if (userEmailElement) {
+            userEmailElement.textContent = user.email;
+        }
+    }
+
+    // Kullanıcı girişi
+    async function login(email, password) {
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                currentUser = data.user;
+                isAuthenticated = true;
+
+                // Kullanıcı bilgilerini güncelle
+                updateUserInfo(currentUser);
+
+                // Sohbetleri yükle
+                loadConversationsFromDB();
+
+                showToast('Giriş başarılı!', 'success');
+                return true;
+            } else {
+                showToast(data.error || 'Giriş başarısız', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Giriş hatası:', error);
+            showToast('Bağlantı hatası. Lütfen tekrar deneyin.', 'error');
+            return false;
+        }
+    }
+
+    // Kullanıcı kaydı
+    async function register(name, email, password) {
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, email, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                currentUser = data.user;
+                isAuthenticated = true;
+
+                // Kullanıcı bilgilerini güncelle
+                updateUserInfo(currentUser);
+
+                showToast('Kayıt başarılı!', 'success');
+                return true;
+            } else {
+                showToast(data.error || 'Kayıt başarısız', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Kayıt hatası:', error);
+            showToast('Bağlantı hatası. Lütfen tekrar deneyin.', 'error');
+            return false;
+        }
+    }
+
+    // Çıkış yap
+    async function logout() {
+        try {
+            const response = await fetch('/api/logout', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                currentUser = null;
+                isAuthenticated = false;
+
+                // Sayfayı yenile (giriş sayfasına dönmek için)
+                window.location.reload();
+
+                return true;
+            } else {
+                showToast('Çıkış yapılamadı', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Çıkış hatası:', error);
+            showToast('Bağlantı hatası. Lütfen tekrar deneyin.', 'error');
+            return false;
+        }
+    }
+
+    // Veritabanından sohbetleri yükle
+    async function loadConversationsFromDB() {
+        try {
+            const response = await fetch('/api/conversations');
+            const data = await response.json();
+
+            if (response.ok) {
+                // Mevcut sohbetleri temizle ve sunucudan gelen verileri yükle
+                conversations = [];
+                conversationsList.innerHTML = '';
+
+                if (data.conversations && data.conversations.length > 0) {
+                    data.conversations.forEach(conv => {
+                        conversations.push({
+                            id: conv.id,
+                            title: conv.title,
+                            messages: []
+                        });
+
+                        addConversationToSidebar({
+                            id: conv.id,
+                            title: conv.title,
+                            messages: []
+                        });
+                    });
+
+                    // İlk sohbeti seç
+                    if (conversations.length > 0) {
+                        loadConversation(conversations[0].id);
+                    }
+                } else {
+                    // Hiç sohbet yoksa yeni bir tane başlat
+                    createNewConversation();
+                }
+            } else {
+                showToast(data.error || 'Sohbetler yüklenirken bir hata oluştu', 'error');
+            }
+        } catch (error) {
+            console.error('Sohbetleri yükleme hatası:', error);
+            showToast('Sunucu bağlantısı hatası', 'error');
+        }
+    }
+
+    // Seçili sohbetteki mesajları yükle
+    async function loadMessages(conversationId) {
+        try {
+            const response = await fetch(`/api/messages/${conversationId}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                chatMessages.innerHTML = '';
+
+                // Bulunan sohbeti currentConversation olarak ayarla
+                const selectedConv = conversations.find(c => c.id === conversationId);
+                if (selectedConv) {
+                    currentConversation = {
+                        id: selectedConv.id,
+                        title: selectedConv.title,
+                        messages: []
+                    };
+
+                    // Başlığı güncelle
+                    document.querySelector('.conversation-title').textContent = selectedConv.title;
+                }
+
+                // Mesajları ekle
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        const messageObj = {
+                            text: msg.content,
+                            isUser: msg.is_user,
+                            timestamp: new Date(msg.created_at)
+                        };
+
+                        // Mesajı ekrana ekle
+                        addMessage(messageObj.text, messageObj.isUser, false);
+
+                        // Mesajı yerel diziye ekle
+                        currentConversation.messages.push(messageObj);
+                    });
+
+                    // Kod kopyalama butonlarını etkinleştir
+                    setupCodeCopyButtons();
+
+                    // Öneri çiplerini gizle
+                    document.querySelector('.suggestion-chips').style.display = 'none';
+                } else {
+                    // Mesaj yoksa öneri çiplerini göster
+                    document.querySelector('.suggestion-chips').style.display = 'flex';
+                }
+
+                // Aktif sohbet öğesini güncelle
+                updateActiveSidebar(conversationId);
+
+                // Aşağı kaydır
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else {
+                showToast(data.error || 'Mesajlar yüklenirken bir hata oluştu', 'error');
+            }
+        } catch (error) {
+            console.error('Mesajları yükleme hatası:', error);
+            showToast('Sunucu bağlantısı hatası', 'error');
+        }
+    }
+
+    // Sohbeti yükle
+    async function loadConversation(conversationId) {
+        if (conversationId) {
+            await loadMessages(conversationId);
+        }
+    }
+
+    // Yeni sohbet oluştur ve veritabanına kaydet
+    async function createNewConversation() {
+        try {
+            const response = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ title: "Yeni Sohbet" })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const newConversation = {
+                    id: data.conversation.id,
+                    title: data.conversation.title,
+                    messages: []
+                };
+
+                // Yeni sohbeti ekle
+                conversations.push(newConversation);
+                addConversationToSidebar(newConversation);
+
+                // Yeni sohbeti currentConversation olarak ayarla
+                currentConversation = {
+                    id: newConversation.id,
+                    title: newConversation.title,
+                    messages: []
+                };
+
+                // Sohbet alanını temizle
+                resetChatArea();
+
+                // Başlığı güncelle
+                document.querySelector('.conversation-title').textContent = newConversation.title;
+
+                // Aktif sohbeti işaretle
+                updateActiveSidebar(newConversation.id);
+
+                return newConversation.id;
+            } else {
+                showToast(data.error || 'Sohbet oluşturulurken bir hata oluştu', 'error');
+                return null;
+            }
+        } catch (error) {
+            console.error('Sohbet oluşturma hatası:', error);
+            showToast('Sunucu bağlantısı hatası', 'error');
+            return null;
+        }
+    }
+
+    // Sohbeti sil
+    async function deleteConversation(conversationId) {
+        try {
+            const response = await fetch(`/api/conversations/${conversationId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Sohbeti diziden kaldır
+                const index = conversations.findIndex(c => c.id === conversationId);
+                if (index >= 0) {
+                    conversations.splice(index, 1);
+                }
+
+                // Sidebar'dan sohbet öğesini kaldır
+                const conversationItem = document.querySelector(`.conversation-item[data-id="${conversationId}"]`);
+                if (conversationItem) {
+                    conversationItem.remove();
+                }
+
+                // Eğer başka sohbetler varsa ilkini seç, yoksa yeni sohbet oluştur
+                if (conversations.length > 0) {
+                    loadConversation(conversations[0].id);
+                } else {
+                    createNewConversation();
+                }
+
+                showToast('Sohbet silindi', 'info');
+                return true;
+            } else {
+                showToast(data.error || 'Sohbet silinirken bir hata oluştu', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Sohbet silme hatası:', error);
+            showToast('Sunucu bağlantısı hatası', 'error');
+            return false;
+        }
+    }
+
+    // Sohbet başlığını güncelle
+    async function updateConversationTitle(conversationId, title) {
+        try {
+            const response = await fetch(`/api/conversations/${conversationId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ title })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Yerel olarak sohbet başlığını güncelle
+                const conversation = conversations.find(c => c.id === conversationId);
+                if (conversation) {
+                    conversation.title = title;
+                }
+
+                if (currentConversation.id === conversationId) {
+                    currentConversation.title = title;
+                    document.querySelector('.conversation-title').textContent = title;
+                }
+
+                // Sidebar'daki başlığı güncelle
+                const conversationItem = document.querySelector(`.conversation-item[data-id="${conversationId}"] span`);
+                if (conversationItem) {
+                    conversationItem.textContent = title;
+                }
+
+                return true;
+            } else {
+                showToast(data.error || 'Başlık güncellenirken bir hata oluştu', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Başlık güncelleme hatası:', error);
+            showToast('Sunucu bağlantısı hatası', 'error');
+            return false;
+        }
     }
 
     // Tema değiştirme
@@ -247,16 +648,22 @@ document.addEventListener('DOMContentLoaded', function () {
         profileMenu.classList.toggle('show');
     });
 
+    // Çıkış butonuna tıklama işlevi
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            logout();
+        });
+    }
+
     // Sayfa herhangi bir yerine tıklandığında profil menüsünü kapat
     document.addEventListener('click', function (event) {
-        if (profileMenu && profileMenu.classList.contains('show') &&
-            !profileMenu.contains(event.target) &&
-            !userProfile.contains(event.target)) {
+        if (profileMenu.classList.contains('show')) {
             profileMenu.classList.remove('show');
         }
 
         // Eğer ayarlar paneli açıksa ve dışına tıklanırsa kapat
-        if (settingsPanel && settingsPanel.classList.contains('show') &&
+        if (settingsPanel.classList.contains('show') &&
             !settingsPanel.contains(event.target) &&
             !settingsBtn.contains(event.target)) {
             settingsPanel.classList.remove('show');
@@ -264,30 +671,22 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Profil menüsünün içine tıklandığında kapanmasını engelle
-    if (profileMenu) {
-        profileMenu.addEventListener('click', function (e) {
-            e.stopPropagation();
-        });
-    }
+    profileMenu.addEventListener('click', function (e) {
+        e.stopPropagation();
+    });
 
     // Modalları aç/kapat
-    if (attachBtn) {
-        attachBtn.addEventListener('click', function () {
-            fileModal.classList.add('show');
-        });
-    }
+    attachBtn.addEventListener('click', function () {
+        fileModal.classList.add('show');
+    });
 
-    if (closeModals) {
-        closeModals.forEach(closeBtn => {
-            closeBtn.addEventListener('click', function () {
-                // Bu butonun en yakın modal parent'ını bul ve gizle
-                const modal = this.closest('.modal');
-                if (modal) {
-                    modal.classList.remove('show');
-                }
-            });
+    closeModals.forEach(closeBtn => {
+        closeBtn.addEventListener('click', function () {
+            // Bu butonun en yakın modal parent'ını bul ve gizle
+            const modal = this.closest('.modal');
+            modal.classList.remove('show');
         });
-    }
+    });
 
     // Modlar arası geçiş
     modeBtns.forEach(btn => {
@@ -308,34 +707,30 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Öneri çipleri
-    if (suggestionChips) {
-        suggestionChips.forEach(chip => {
-            chip.addEventListener('click', function () {
-                const text = this.textContent;
-                userInput.value = text;
-                userInput.focus();
-            });
+    suggestionChips.forEach(chip => {
+        chip.addEventListener('click', function () {
+            const text = this.textContent;
+            userInput.value = text;
+            userInput.focus();
         });
-    }
+    });
 
     // Mikrofon butonu
-    if (micBtn) {
-        micBtn.addEventListener('click', function () {
-            if (isRecording) {
-                // Kaydı durdur
-                stopSpeechRecognition();
-                micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-                micBtn.style.color = '';
-                isRecording = false;
-            } else {
-                // Kaydı başlat
-                startSpeechRecognition();
-                micBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
-                micBtn.style.color = 'var(--danger-red)';
-                isRecording = true;
-            }
-        });
-    }
+    micBtn.addEventListener('click', function () {
+        if (isRecording) {
+            // Kaydı durdur
+            stopSpeechRecognition();
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            micBtn.style.color = '';
+            isRecording = false;
+        } else {
+            // Kaydı başlat
+            startSpeechRecognition();
+            micBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+            micBtn.style.color = 'var(--danger-red)';
+            isRecording = true;
+        }
+    });
 
     // Konuşma tanıma
     function startSpeechRecognition() {
@@ -376,122 +771,87 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Sohbeti dışa aktar
-    if (exportBtn) {
-        exportBtn.addEventListener('click', function () {
-            if (currentConversation.messages.length === 0) {
-                showToast(window.t ? window.t('noConversationToExport') :
-                    'Dışa aktarılacak sohbet bulunamadı', 'warning');
-                return;
-            }
+    exportBtn.addEventListener('click', function () {
+        if (currentConversation.messages.length === 0) {
+            showToast(window.t ? window.t('noConversationToExport') :
+                'Dışa aktarılacak sohbet bulunamadı', 'warning');
+            return;
+        }
 
-            // Sohbeti dışa aktar
-            const exportData = {
-                title: currentConversation.title,
-                date: new Date().toISOString(),
-                messages: currentConversation.messages
-            };
+        // Sohbeti dışa aktar
+        const exportData = {
+            title: currentConversation.title,
+            date: new Date().toISOString(),
+            messages: currentConversation.messages
+        };
 
-            const dataStr = JSON.stringify(exportData, null, 2);
-            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
 
-            const exportFileName = `turna-chat-${new Date().toISOString().slice(0, 10)}.json`;
+        const exportFileName = `turna-chat-${new Date().toISOString().slice(0, 10)}.json`;
 
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportFileName);
-            linkElement.click();
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileName);
+        linkElement.click();
 
-            showToast(window.t ? window.t('conversationExported') :
-                'Sohbet başarıyla dışa aktarıldı', 'success');
-        });
+        showToast(window.t ? window.t('conversationExported') :
+            'Sohbet başarıyla dışa aktarıldı', 'success');
+    });
+
+    // Sohbet alanını sıfırla
+    function resetChatArea() {
+        // Sohbet alanını temizle - Çeviri desteğiyle karşılama mesajı
+        const welcomeMsg = window.t ? window.t('welcome') : 'Turna AI Chat\'e hoş geldiniz! Size nasıl yardımcı olabilirim?';
+        const capabilitiesMsg = window.t ? window.t('capabilities') : 'İşte yapabileceğim bazı şeyler:';
+        const capability1Msg = window.t ? window.t('capability1') : 'Sorularınızı yanıtlayabilirim';
+        const capability2Msg = window.t ? window.t('capability2') : 'Yaratıcı içerik oluşturabilirim';
+        const capability3Msg = window.t ? window.t('capability3') : 'Metinleri düzenleyebilirim';
+        const capability4Msg = window.t ? window.t('capability4') : 'Kodlama yardımı sunabilirim';
+        const copyMsg = window.t ? window.t('copy') : 'Kopyala';
+        const likeMsg = window.t ? window.t('like') : 'Beğen';
+        const dislikeMsg = window.t ? window.t('dislike') : 'Beğenme';
+        chatMessages.innerHTML = `
+        <div class="message bot">
+            <div class="message-content">
+                <p>${welcomeMsg}</p>
+                <p>${capabilitiesMsg}</p>
+                <ul>
+                    <li>${capability1Msg}</li>
+                    <li>${capability2Msg}</li>
+                    <li>${capability3Msg}</li>
+                    <li>${capability4Msg}</li>
+                </ul>
+            </div>
+            <div class="message-actions">
+                <button class="copy-btn" title="${copyMsg}"><i class="fas fa-copy"></i></button>
+                <button class="thumbs-up-btn" title="${likeMsg}"><i class="fas fa-thumbs-up"></i></button>
+                <button class="thumbs-down-btn" title="${dislikeMsg}"><i class="fas fa-thumbs-down"></i></button>
+            </div>
+        </div>
+        `;
+
+        // Öneri çiplerini göster
+        document.querySelector('.suggestion-chips').style.display = 'flex';
+
+        // Kod kopyalama butonlarını etkinleştir
+        setupCodeCopyButtons();
     }
 
     // Yeni sohbet başlat
-    if (newChatButton) {
-        newChatButton.addEventListener('click', function () {
-            // Mevcut sohbeti kaydet
-            if (currentConversation.messages.length > 0) {
-                conversations.push({ ...currentConversation });
-                addConversationToSidebar(currentConversation);
-            }
-
-            // Sohbet alanını temizle - Çeviri desteğiyle karşılama mesajı
-            const welcomeMsg = window.t ? window.t('welcome') : 'Turna AI Chat\'e hoş geldiniz! Size nasıl yardımcı olabilirim?';
-            const capabilitiesMsg = window.t ? window.t('capabilities') : 'İşte yapabileceğim bazı şeyler:';
-            const capability1Msg = window.t ? window.t('capability1') : 'Sorularınızı yanıtlayabilirim';
-            const capability2Msg = window.t ? window.t('capability2') : 'Yaratıcı içerik oluşturabilirim';
-            const capability3Msg = window.t ? window.t('capability3') : 'Metinleri düzenleyebilirim';
-            const capability4Msg = window.t ? window.t('capability4') : 'Kodlama yardımı sunabilirim';
-            const copyMsg = window.t ? window.t('copy') : 'Kopyala';
-            const likeMsg = window.t ? window.t('like') : 'Beğen';
-            const dislikeMsg = window.t ? window.t('dislike') : 'Beğenme';
-
-            chatMessages.innerHTML = `
-            <div class="message bot">
-                <div class="message-content">
-                    <p>${welcomeMsg}</p>
-                    <p>${capabilitiesMsg}</p>
-                    <ul>
-                        <li>${capability1Msg}</li>
-                        <li>${capability2Msg}</li>
-                        <li>${capability3Msg}</li>
-                        <li>${capability4Msg}</li>
-                    </ul>
-                </div>
-                <div class="message-actions">
-                    <button class="copy-btn" title="${copyMsg}"><i class="fas fa-copy"></i></button>
-                    <button class="thumbs-up-btn" title="${likeMsg}"><i class="fas fa-thumbs-up"></i></button>
-                    <button class="thumbs-down-btn" title="${dislikeMsg}"><i class="fas fa-thumbs-down"></i></button>
-                </div>
-            </div>
-            `;
-
-            // Yeni sohbet başlat
-            currentConversation = {
-                id: Date.now(),
-                title: window.t ? window.t('newChat') : "Yeni Sohbet",
-                messages: []
-            };
-
-            // Başlığı güncelle
-            const conversationTitle = document.querySelector('.conversation-title');
-            if (conversationTitle) {
-                conversationTitle.textContent = window.t ? window.t('newChat') : "Yeni Sohbet";
-            }
-
-            // Aktif sohbeti güncelle
-            updateActiveSidebar();
-
-            // Öneri çiplerini göster
-            const suggestionChipsContainer = document.querySelector('.suggestion-chips');
-            if (suggestionChipsContainer) {
-                suggestionChipsContainer.style.display = 'flex';
-            }
-
-            // Kod kopyalama butonlarını etkinleştir
-            setupCodeCopyButtons();
-        });
-    }
+    newChatButton.addEventListener('click', async function () {
+        // Yeni sohbet oluştur
+        await createNewConversation();
+    });
 
     // Yan menüye sohbet ekle
     function addConversationToSidebar(conversation) {
-        if (!conversationsList) return;
-
-        // İlk mesajdan kısa bir başlık oluştur
-        let title = window.t ? window.t('newChat') : "Yeni Sohbet";
-        if (conversation.messages.length > 0) {
-            const firstUserMsg = conversation.messages.find(msg => msg.isUser);
-            if (firstUserMsg) {
-                title = firstUserMsg.text.substring(0, 20) + (firstUserMsg.text.length > 20 ? "..." : "");
-            }
-        }
-
         const conversationItem = document.createElement('div');
         conversationItem.className = 'conversation-item';
         conversationItem.dataset.id = conversation.id;
         conversationItem.innerHTML = `
             <i class="fas fa-comment-dots"></i>
-            <span>${title}</span>
+            <span>${conversation.title}</span>
             <button class="delete-conversation"><i class="fas fa-times"></i></button>
         `;
 
@@ -503,43 +863,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Sohbeti yükle
             const id = this.dataset.id;
-            const selectedConv = conversations.find(c => c.id == id);
-
-            if (selectedConv) {
-                // Mevcut sohbeti kaydet
-                if (currentConversation.messages.length > 0) {
-                    const existingIndex = conversations.findIndex(c => c.id == currentConversation.id);
-                    if (existingIndex >= 0) {
-                        conversations[existingIndex] = { ...currentConversation };
-                    } else {
-                        conversations.push({ ...currentConversation });
-                    }
-                }
-
-                // Seçilen sohbeti yükle
-                currentConversation = { ...selectedConv };
-
-                // Sohbet içeriğini göster
-                renderConversation(currentConversation);
-
-                // Başlığı güncelle
-                const conversationTitle = document.querySelector('.conversation-title');
-                if (conversationTitle) {
-                    conversationTitle.textContent = selectedConv.title;
-                }
-
-                // Öneri çiplerini gizle
-                const suggestionChipsContainer = document.querySelector('.suggestion-chips');
-                if (suggestionChipsContainer) {
-                    suggestionChipsContainer.style.display = 'none';
-                }
-            }
-
-            // Aktif sohbeti işaretle
-            document.querySelectorAll('.conversation-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            this.classList.add('active');
+            loadConversation(id);
 
             // Mobil görünümde sidebar'ı kapat
             if (window.innerWidth <= 768) {
@@ -549,69 +873,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Silme butonuna tıklama işlevi ekle
         const deleteBtn = conversationItem.querySelector('.delete-conversation');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const id = conversationItem.dataset.id;
-
-                // Sohbeti diziden kaldır
-                const index = conversations.findIndex(c => c.id == id);
-                if (index >= 0) {
-                    conversations.splice(index, 1);
-                }
-
-                // DOM'dan kaldır
-                conversationItem.remove();
-
-                // Eğer aktif sohbet silindiyse yeni sohbet başlat
-                if (currentConversation.id == id) {
-                    if (newChatButton) {
-                        newChatButton.click();
-                    }
-                }
-
-                showToast(window.t ? window.t('deleteConversation') : 'Sohbet silindi', 'info');
-            });
-        }
+        deleteBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const id = conversationItem.dataset.id;
+            deleteConversation(id);
+        });
 
         conversationsList.insertBefore(conversationItem, conversationsList.firstChild);
     }
 
-    // Sohbeti ekrana yükle
-    function renderConversation(conversation) {
-        if (!chatMessages) return;
-
-        chatMessages.innerHTML = '';
-
-        conversation.messages.forEach(msg => {
-            if (msg.isUser) {
-                addMessage(msg.text, true, false);
+    // Aktif sohbeti sidebar'da güncelle
+    function updateActiveSidebar(conversationId) {
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            if (item.dataset.id === conversationId) {
+                item.classList.add('active');
             } else {
-                addMessage(msg.text, false, false);
+                item.classList.remove('active');
             }
         });
-
-        // Kod kopyalama butonlarını etkinleştir
-        setupCodeCopyButtons();
-    }
-
-    // Aktif sohbeti sidebar'da güncelle
-    function updateActiveSidebar() {
-        document.querySelectorAll('.conversation-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        // "Yeni Sohbet" elemanını aktif yap (veya uygun olanı)
-        const firstItem = document.querySelector('.conversation-item');
-        if (firstItem) {
-            firstItem.classList.add('active');
-        }
     }
 
     // Mesajı sohbete ekle
     function addMessage(text, isUser = false, saveToHistory = true) {
-        if (!chatMessages) return;
-
         const messageDiv = document.createElement('div');
         messageDiv.className = isUser ? 'message user' : 'message bot';
 
@@ -641,55 +924,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Kopyalama işlevi
             const copyBtn = actionsDiv.querySelector('.copy-btn');
-            if (copyBtn) {
-                copyBtn.addEventListener('click', function () {
-                    navigator.clipboard.writeText(text.replace(/<[^>]*>/g, ''))
-                        .then(() => {
-                            showToast(window.t ? window.t('messageCopied') : 'Mesaj panoya kopyalandı', 'success');
-                        })
-                        .catch(err => {
-                            console.error('Kopyalama hatası:', err);
-                            showToast(window.t ? window.t('copyFailed') : 'Kopyalama başarısız oldu', 'error');
-                        });
-                });
-            }
+            copyBtn.addEventListener('click', function () {
+                navigator.clipboard.writeText(text.replace(/<[^>]*>/g, ''))
+                    .then(() => {
+                        showToast(window.t ? window.t('messageCopied') : 'Mesaj panoya kopyalandı', 'success');
+                    })
+                    .catch(err => {
+                        console.error('Kopyalama hatası:', err);
+                        showToast(window.t ? window.t('copyFailed') : 'Kopyalama başarısız oldu', 'error');
+                    });
+            });
 
             // Beğen/beğenme butonları
             const thumbsUpBtn = actionsDiv.querySelector('.thumbs-up-btn');
             const thumbsDownBtn = actionsDiv.querySelector('.thumbs-down-btn');
 
-            if (thumbsUpBtn) {
-                thumbsUpBtn.addEventListener('click', function () {
-                    if (this.classList.contains('active')) {
-                        this.classList.remove('active');
-                    } else {
-                        this.classList.add('active');
-                        if (thumbsDownBtn) {
-                            thumbsDownBtn.classList.remove('active');
-                        }
-                        showToast(window.t ? window.t('feedbackReceived') : 'Teşekkürler! Geri bildiriminiz alındı.', 'success');
-                    }
-                });
-            }
+            thumbsUpBtn.addEventListener('click', function () {
+                if (this.classList.contains('active')) {
+                    this.classList.remove('active');
+                } else {
+                    this.classList.add('active');
+                    thumbsDownBtn.classList.remove('active');
+                    showToast(window.t ? window.t('feedbackReceived') : 'Teşekkürler! Geri bildiriminiz alındı.', 'success');
+                }
+            });
 
-            if (thumbsDownBtn) {
-                thumbsDownBtn.addEventListener('click', function () {
-                    if (this.classList.contains('active')) {
-                        this.classList.remove('active');
-                    } else {
-                        this.classList.add('active');
-                        if (thumbsUpBtn) {
-                            thumbsUpBtn.classList.remove('active');
-                        }
+            thumbsDownBtn.addEventListener('click', function () {
+                if (this.classList.contains('active')) {
+                    this.classList.remove('active');
+                } else {
+                    this.classList.add('active');
+                    thumbsUpBtn.classList.remove('active');
 
-                        // Geri bildirim modalını göster
-                        const feedbackModal = document.getElementById('feedback-modal');
-                        if (feedbackModal) {
-                            feedbackModal.classList.add('show');
-                        }
-                    }
-                });
-            }
+                    // Geri bildirim modalını göster
+                    document.getElementById('feedback-modal').classList.add('show');
+                }
+            });
 
             messageDiv.appendChild(actionsDiv);
         }
@@ -707,11 +977,21 @@ document.addEventListener('DOMContentLoaded', function () {
             // Eğer bu ilk kullanıcı mesajıysa, sohbet başlığını güncelle
             if (isUser && currentConversation.messages.filter(msg => msg.isUser).length === 1) {
                 const title = text.substring(0, 20) + (text.length > 20 ? "..." : "");
-                const conversationTitle = document.querySelector('.conversation-title');
-                if (conversationTitle) {
-                    conversationTitle.textContent = title;
-                }
+
+                // Başlığı yerel olarak güncelle
+                document.querySelector('.conversation-title').textContent = title;
                 currentConversation.title = title;
+
+                // Başlığı veritabanında güncelle
+                if (currentConversation.id) {
+                    updateConversationTitle(currentConversation.id, title);
+                }
+
+                // Sidebar'daki başlığı güncelle
+                const conversationItem = document.querySelector(`.conversation-item[data-id="${currentConversation.id}"] span`);
+                if (conversationItem) {
+                    conversationItem.textContent = title;
+                }
             }
         }
 
@@ -719,10 +999,7 @@ document.addEventListener('DOMContentLoaded', function () {
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
         // Öneri çiplerini gizle, mesaj gönderdikten sonra
-        const suggestionChipsContainer = document.querySelector('.suggestion-chips');
-        if (suggestionChipsContainer) {
-            suggestionChipsContainer.style.display = 'none';
-        }
+        document.querySelector('.suggestion-chips').style.display = 'none';
 
         return messageDiv;
     }
@@ -798,8 +1075,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Yükleniyor göstergesi
     function showLoading() {
-        if (!chatMessages) return;
-
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'loading';
         loadingDiv.id = 'loading-indicator';
@@ -824,8 +1099,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Hata mesajı göster
     function showError(message) {
-        if (!chatMessages) return;
-
         const errorDiv = document.createElement('div');
         errorDiv.className = 'message bot error-message';
 
@@ -840,23 +1113,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Temizle butonuna basıldığında girdi alanını temizle
-    if (clearButton) {
-        clearButton.addEventListener('click', function () {
-            if (userInput) {
-                userInput.value = '';
-                userInput.focus();
-            }
-        });
-    }
+    clearButton.addEventListener('click', function () {
+        userInput.value = '';
+        userInput.focus();
+    });
 
     // Mesajı API'ye gönder
     async function sendMessage() {
-        if (!userInput || !chatMessages) return;
-
         const message = userInput.value.trim();
 
         if (!message) {
             return;
+        }
+
+        // Eğer henüz bir sohbet yoksa veya currentConversation.id null ise, yeni sohbet oluştur
+        if (!currentConversation.id) {
+            const newConversationId = await createNewConversation();
+            if (!newConversationId) {
+                showToast('Sohbet oluşturulamadı. Lütfen tekrar deneyin.', 'error');
+                return;
+            }
         }
 
         // Kullanıcı mesajını sohbete ekle
@@ -869,30 +1145,33 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading();
 
         try {
-            // Seçilen moda göre sisteme farklı bir parametre gönder
-            let promptPrefix = '';
+            // Kullanıcı kimlik doğrulama kontrolü
+            let endpoint = '/api/generate';
+            let requestBody = {
+                prompt: message,
+                mode: currentMode
+            };
 
-            if (currentMode === 'creative') {
-                promptPrefix = 'YARATICI MOD: ';
-            } else if (currentMode === 'precise') {
-                promptPrefix = 'KESİN MOD: ';
+            // Eğer kullanıcı giriş yapmışsa ve bir sohbet kimliği varsa
+            if (isAuthenticated && currentConversation.id) {
+                endpoint = '/api/messages';
+                requestBody.conversation_id = currentConversation.id;
             }
 
-            const response = await fetch('/api/generate', {
+            // API'ye istek gönder
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    prompt: promptPrefix + message,
-                    mode: currentMode
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
             hideLoading();
 
             if (response.ok) {
+                // AI yanıtını ekle
                 addMessage(data.response);
 
                 // Mesaj alma olayını tetikle (ses bildirimleri için)
@@ -901,6 +1180,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Kod kopyalama butonlarını etkinleştir
                 setupCodeCopyButtons();
             } else {
+                // Eğer kimlik doğrulama hatası varsa ve login.html sayfası varsa, kullanıcıyı giriş sayfasına yönlendir
+                if (response.status === 401) {
+                    showToast('Oturum süresi doldu. Lütfen tekrar giriş yapın.', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/login.html';
+                    }, 2000);
+                    return;
+                }
+
                 const errorMsg = window.t ? window.t('error') : 'Bir hata oluştu. Lütfen tekrar deneyin.';
                 showError(data.error || errorMsg);
             }
@@ -917,8 +1205,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.code-copy-btn').forEach(btn => {
             btn.addEventListener('click', function () {
                 const codeBlock = this.nextElementSibling;
-                if (!codeBlock) return;
-
                 const code = codeBlock.textContent;
 
                 navigator.clipboard.writeText(code)
@@ -955,10 +1241,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Seçilen yıldıza kadar doldur
             for (let i = 1; i <= rating; i++) {
-                const starElement = document.querySelector(`.star-rating i[data-rating="${i}"]`);
-                if (starElement) {
-                    starElement.className = 'fas fa-star';
-                }
+                document.querySelector(`.star-rating i[data-rating="${i}"]`).className = 'fas fa-star';
             }
         });
     });
@@ -968,10 +1251,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (submitFeedbackBtn) {
         submitFeedbackBtn.addEventListener('click', function () {
             // Burada gerçek bir uygulamada sunucuya geri bildirim gönderilirdi
-            const feedbackModal = document.getElementById('feedback-modal');
-            if (feedbackModal) {
-                feedbackModal.classList.remove('show');
-            }
+            document.getElementById('feedback-modal').classList.remove('show');
             const thankYouMsg = window.t ? window.t('feedbackThanks') : 'Geri bildiriminiz için teşekkürler!';
             showToast(thankYouMsg, 'success');
         });
@@ -993,113 +1273,91 @@ document.addEventListener('DOMContentLoaded', function () {
                 const uploadBtn = document.querySelector('.upload-btn');
 
                 // Butonu etkinleştir
-                if (uploadBtn) {
-                    uploadBtn.disabled = false;
-                }
+                uploadBtn.disabled = false;
 
                 // Dosya bilgilerini göster
                 const uploadArea = document.querySelector('.upload-area');
-                if (uploadArea) {
-                    uploadArea.innerHTML = `
-                        <div class="uploaded-files">
-                            <div class="file-item">
-                                <i class="file-icon fas fa-file"></i>
-                                <div class="file-info">
-                                    <div class="file-name">${file.name}</div>
-                                    <div class="file-size">${formatFileSize(file.size)}</div>
-                                </div>
-                                <button class="file-remove"><i class="fas fa-times"></i></button>
-                            </div>
+                uploadArea.innerHTML = `
+                <div class="uploaded-files">
+                    <div class="file-item">
+                        <i class="file-icon fas fa-file"></i>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${formatFileSize(file.size)}</div>
                         </div>
-                    `;
+                        <button class="file-remove"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+            `;
 
-                    // Dosyayı kaldır butonu
-                    const removeBtn = document.querySelector('.file-remove');
-                    if (removeBtn) {
-                        removeBtn.addEventListener('click', function () {
-                            fileInput.value = '';
-                            if (uploadBtn) {
-                                uploadBtn.disabled = true;
-                            }
+                // Dosyayı kaldır butonu
+                const removeBtn = document.querySelector('.file-remove');
+                removeBtn.addEventListener('click', function () {
+                    fileInput.value = '';
+                    uploadBtn.disabled = true;
 
-                            const dragDropText = window.t ? window.t('dragDrop') : 'Dosyalarınızı buraya sürükleyin veya';
-                            const chooseBtnText = window.t ? window.t('chooseFile') : 'Dosya Seçin';
+                    const dragDropText = window.t ? window.t('dragDrop') : 'Dosyalarınızı buraya sürükleyin veya';
+                    const chooseBtnText = window.t ? window.t('chooseFile') : 'Dosya Seçin';
 
-                            uploadArea.innerHTML = `
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p>${dragDropText}</p>
-                                <button class="browse-btn">${chooseBtnText}</button>
-                            `;
+                    uploadArea.innerHTML = `
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>${dragDropText}</p>
+                    <button class="browse-btn">${chooseBtnText}</button>
+                `;
 
-                            // Browse butonunu yeniden etkinleştir
-                            const newBrowseBtn = document.querySelector('.browse-btn');
-                            if (newBrowseBtn) {
-                                newBrowseBtn.addEventListener('click', function () {
-                                    fileInput.click();
-                                });
-                            }
-                        });
-                    }
+                    // Browse butonunu yeniden etkinleştir
+                    document.querySelector('.browse-btn').addEventListener('click', function () {
+                        fileInput.click();
+                    });
+                });
 
-                    // Yükle butonu
-                    if (uploadBtn) {
-                        uploadBtn.addEventListener('click', function () {
-                            // Burada gerçek bir uygulamada dosya sunucuya yüklenirdi
+                // Yükle butonu
+                uploadBtn.addEventListener('click', function () {
+                    // Burada gerçek bir uygulamada dosya sunucuya yüklenirdi
 
-                            // İlerleme göstergesi göster
-                            const uploadingText = window.t ? window.t('uploading') : 'Yükleniyor...';
+                    // İlerleme göstergesi göster
+                    const uploadingText = window.t ? window.t('uploading') : 'Yükleniyor...';
 
-                            const progressHTML = `
-                                <div class="upload-progress show">
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar" style="width: 0%"></div>
-                                    </div>
-                                    <div class="progress-text">
-                                        <span>${uploadingText}</span>
-                                        <span>0%</span>
-                                    </div>
-                                </div>
-                            `;
+                    const progressHTML = `
+                    <div class="upload-progress show">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span>${uploadingText}</span>
+                            <span>0%</span>
+                        </div>
+                    </div>
+                `;
 
-                            uploadArea.insertAdjacentHTML('beforeend', progressHTML);
+                    uploadArea.insertAdjacentHTML('beforeend', progressHTML);
 
-                            // İlerleme animasyonu
-                            let progress = 0;
-                            const progressBar = document.querySelector('.progress-bar');
-                            const progressText = document.querySelector('.progress-text span:last-child');
+                    // İlerleme animasyonu
+                    let progress = 0;
+                    const progressBar = document.querySelector('.progress-bar');
+                    const progressText = document.querySelector('.progress-text span:last-child');
 
-                            const interval = setInterval(() => {
-                                progress += 5;
-                                if (progressBar) {
-                                    progressBar.style.width = `${progress}%`;
-                                }
-                                if (progressText) {
-                                    progressText.textContent = `${progress}%`;
-                                }
+                    const interval = setInterval(() => {
+                        progress += 5;
+                        progressBar.style.width = `${progress}%`;
+                        progressText.textContent = `${progress}%`;
 
-                                if (progress >= 100) {
-                                    clearInterval(interval);
-                                    const fileModal = document.getElementById('file-modal');
-                                    if (fileModal) {
-                                        fileModal.classList.remove('show');
-                                    }
+                        if (progress >= 100) {
+                            clearInterval(interval);
+                            document.getElementById('file-modal').classList.remove('show');
 
-                                    const uploadedMsg = window.t ?
-                                        window.t('fileUploaded').replace('{filename}', file.name) :
-                                        `"${file.name}" dosyası başarıyla yüklendi`;
+                            const uploadedMsg = window.t ?
+                                window.t('fileUploaded').replace('{filename}', file.name) :
+                                `"${file.name}" dosyası başarıyla yüklendi`;
 
-                                    showToast(uploadedMsg, 'success');
+                            showToast(uploadedMsg, 'success');
 
-                                    // Mesaj alanına dosya bilgisi ekle
-                                    if (userInput) {
-                                        userInput.value += `\n[Ek dosya: ${file.name}] `;
-                                        userInput.focus();
-                                    }
-                                }
-                            }, 100);
-                        });
-                    }
-                }
+                            // Mesaj alanına dosya bilgisi ekle
+                            userInput.value += `\n[Ek dosya: ${file.name}] `;
+                            userInput.focus();
+                        }
+                    }, 100);
+                });
             }
         });
     }
@@ -1112,28 +1370,33 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Olay dinleyicileri
-    if (sendButton) {
-        sendButton.addEventListener('click', sendMessage);
-    }
+    sendButton.addEventListener('click', sendMessage);
 
-    if (userInput) {
-        userInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    }
+    userInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
 
     // Başlangıç fonksiyonları
     function initializeApp() {
         // Tema ayarlarını yükle
         loadThemeSettings();
 
+        // Kullanıcı kimlik doğrulama durumunu kontrol et
+        // Bu, otomatik olarak sohbetleri de yükleyecek
+        checkAuthStatus().then(isLoggedIn => {
+            if (!isLoggedIn) {
+                // Eğer giriş yapılmamışsa demo modunda çalış
+                showToast('Demo modunda çalışıyorsunuz. Sohbetleriniz kaydedilmeyecek.', 'warning');
+                // Sayfa yeniden yüklendiğinde yeni bir sohbet başlat
+                resetChatArea();
+            }
+        });
+
         // Sayfa yüklendiğinde girdi alanına odaklan
-        if (userInput) {
-            userInput.focus();
-        }
+        userInput.focus();
 
         // Kod kopyalama butonlarını etkinleştir
         setupCodeCopyButtons();
@@ -1143,9 +1406,6 @@ document.addEventListener('DOMContentLoaded', function () {
             // Arayüz elemanlarını güncelle
             updateUITexts();
         });
-
-        // Giriş/Kayıt kodları buraya ekleniyor
-        initializeAuthAndProfileFeatures();
     }
 
     // Uygulama başlangıcı için sahte yükleme ekranı
@@ -1156,10 +1416,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const loadingText = window.t ? window.t('loading') : 'Turna AI yükleniyor...';
 
         loadingScreen.innerHTML = `
-            <img src="/static/turna-logo.svg" alt="Turna AI" class="app-loading-logo">
-            <div class="app-loading-spinner"></div>
-            <div class="app-loading-text">${loadingText}</div>
-        `;
+        <img src="/static/turna-logo.svg" alt="Turna AI" class="app-loading-logo">
+        <div class="app-loading-spinner"></div>
+        <div class="app-loading-text">${loadingText}</div>
+    `;
 
         document.body.appendChild(loadingScreen);
 
@@ -1176,9 +1436,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!window.t) return; // çeviri fonksiyonu yoksa çık
 
         // Konuşma başlığı 
-        const conversationTitle = document.querySelector('.conversation-title');
-        if (conversationTitle && currentConversation.id === Date.now()) {
-            conversationTitle.textContent = window.t('newChat');
+        if (currentConversation.id === null) {
+            document.querySelector('.conversation-title').textContent = window.t('newChat');
         }
 
         // Buton başlıkları
@@ -1191,329 +1450,124 @@ document.addEventListener('DOMContentLoaded', function () {
         // Öneri çiplerini güncelle - bu kısım translations.js tarafından yönetiliyor
     }
 
-    // Giriş/Kayıt ve Profil Kartları için Başlatma
-    function initializeAuthAndProfileFeatures() {
-        // Giriş/Kayıt modalı
-        const authModal = document.getElementById('auth-modal');
-        const authTabs = document.querySelectorAll('.auth-tab');
-        const authForms = document.querySelectorAll('.auth-form');
-        const guestLoginBtn = document.querySelector('.guest-login-btn');
+    // Kullanıcı giriş formu işlevi
+    function setupLoginForm() {
         const loginForm = document.getElementById('login-form');
-        const signupForm = document.getElementById('signup-form');
-        const togglePasswordBtns = document.querySelectorAll('.toggle-password');
-
-        // Profil kartları
-        const profileCardOverlay = document.getElementById('profile-card-overlay');
-        const profileCards = document.querySelectorAll('.profile-card');
-        const profileOptions = document.querySelectorAll('.profile-option');
-        const closeProfileBtns = document.querySelectorAll('.close-profile-card');
-
-        // Yardım kartı
-        const helpTabs = document.querySelectorAll('.help-tab');
-        const helpContents = document.querySelectorAll('.help-content');
-        const faqItems = document.querySelectorAll('.faq-item');
-
-        // Modal açılışı sonrası tab ve overlay fonksiyonları
-        function openAuthModal() {
-            if (authModal) {
-                authModal.classList.add('show');
-                document.body.style.overflow = 'hidden'; // Scroll'u devre dışı bırak
-            }
-        }
-
-        // Sayfa tamamen yüklendikten sonra giriş modalını göster
-        setTimeout(() => {
-            openAuthModal();
-            console.log("Auth modal opened");
-        }, 500);
-
-        // Tab değiştirme fonksiyonu
-        function changeTab(clickedTab) {
-            const targetTab = clickedTab.dataset.tab;
-
-            // Aktif tab'ı değiştir
-            authTabs.forEach(tab => {
-                tab.classList.remove('active');
-            });
-            clickedTab.classList.add('active');
-
-            // İlgili formu göster
-            authForms.forEach(form => {
-                form.classList.remove('active');
-            });
-            const targetForm = document.getElementById(`${targetTab}-form`);
-            if (targetForm) {
-                targetForm.classList.add('active');
-            }
-        }
-
-        // Tab tıklama olayları
-        if (authTabs) {
-            authTabs.forEach(tab => {
-                tab.addEventListener('click', function () {
-                    changeTab(this);
-                });
-            });
-        }
-
-        // Misafir girişi
-        if (guestLoginBtn) {
-            guestLoginBtn.addEventListener('click', function () {
-                if (authModal) {
-                    authModal.classList.remove('show');
-                    document.body.style.overflow = ''; // Scroll'u etkinleştir
-                    showToast('Misafir olarak giriş yaptınız', 'success');
-                }
-            });
-        }
-
-        // Giriş formu gönderimi
         if (loginForm) {
-            loginForm.addEventListener('submit', function (e) {
+            loginForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
-                const emailInput = document.getElementById('login-email');
-                const passwordInput = document.getElementById('login-password');
 
-                if (emailInput && passwordInput) {
-                    const email = emailInput.value;
-                    const password = passwordInput.value;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
 
-                    // Burada normalde API'ye istek yapılır
-                    // Şimdilik başarılı gibi davranıyoruz
-                    if (authModal) {
-                        authModal.classList.remove('show');
-                        document.body.style.overflow = ''; // Scroll'u etkinleştir
-                        showToast('Başarıyla giriş yaptınız', 'success');
-                    }
+                if (!email || !password) {
+                    showToast('E-posta ve şifre gerekli', 'error');
+                    return;
                 }
-            });
-        }
 
-        // Kayıt formu gönderimi
-        if (signupForm) {
-            signupForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const nameInput = document.getElementById('signup-name');
-                const emailInput = document.getElementById('signup-email');
-                const passwordInput = document.getElementById('signup-password');
-                const confirmPasswordInput = document.getElementById('signup-confirm-password');
+                const loginButton = document.getElementById('login-btn');
+                loginButton.disabled = true;
+                loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Giriş yapılıyor...';
 
-                if (nameInput && emailInput && passwordInput && confirmPasswordInput) {
-                    const name = nameInput.value;
-                    const email = emailInput.value;
-                    const password = passwordInput.value;
-                    const confirmPassword = confirmPasswordInput.value;
+                const success = await login(email, password);
 
-                    // Şifre kontrolü
-                    if (password !== confirmPassword) {
-                        showToast('Şifreler eşleşmiyor', 'error');
-                        return;
-                    }
-
-                    // Burada normalde API'ye istek yapılır
-                    // Şimdilik başarılı gibi davranıyoruz
-                    if (authModal) {
-                        authModal.classList.remove('show');
-                        document.body.style.overflow = ''; // Scroll'u etkinleştir
-                        showToast('Hesabınız başarıyla oluşturuldu', 'success');
-                    }
+                if (success) {
+                    // Ana sayfaya yönlendir
+                    window.location.href = '/';
+                } else {
+                    loginButton.disabled = false;
+                    loginButton.innerHTML = 'Giriş Yap';
                 }
-            });
-        }
-
-        // Şifre göster/gizle butonları
-        if (togglePasswordBtns) {
-            togglePasswordBtns.forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const passwordInput = this.previousElementSibling;
-                    if (passwordInput) {
-                        if (passwordInput.type === 'password') {
-                            passwordInput.type = 'text';
-                            this.innerHTML = '<i class="fas fa-eye-slash"></i>';
-                        } else {
-                            passwordInput.type = 'password';
-                            this.innerHTML = '<i class="fas fa-eye"></i>';
-                        }
-                    }
-                });
-            });
-        }
-
-        // Profil kartını aç
-        function openProfileCard(cardId) {
-            console.log("Opening profile card:", cardId);
-
-            // Tüm kartları gizle
-            if (profileCards) {
-                profileCards.forEach(card => {
-                    card.classList.remove('show');
-                });
-            }
-
-            // İstenen kartı göster
-            const targetCard = document.getElementById(cardId);
-            if (targetCard && profileCardOverlay) {
-                profileCardOverlay.classList.add('show');
-                targetCard.classList.add('show');
-                document.body.style.overflow = 'hidden'; // Scroll'u devre dışı bırak
-            }
-        }
-
-        // Profil kartını kapat
-        function closeProfileCard() {
-            if (profileCardOverlay) {
-                profileCardOverlay.classList.remove('show');
-                if (profileCards) {
-                    profileCards.forEach(card => {
-                        card.classList.remove('show');
-                    });
-                }
-                document.body.style.overflow = ''; // Scroll'u etkinleştir
-            }
-        }
-
-        // Profil menüsündeki butonlar için olay dinleyicileri
-        if (profileOptions) {
-            console.log("Profile options found:", profileOptions.length);
-
-            profileOptions.forEach(option => {
-                option.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    const optionText = this.textContent.trim().toLowerCase();
-                    console.log("Profile option clicked:", optionText);
-
-                    let cardId = '';
-
-                    // Hangi kartın açılacağını belirle
-                    if (optionText.includes('profil')) {
-                        cardId = 'profile-card';
-                    } else if (optionText.includes('geçmiş') || optionText.includes('history')) {
-                        cardId = 'history-card';
-                    } else if (optionText.includes('tercih') || optionText.includes('preferences')) {
-                        cardId = 'preferences-card';
-                    } else if (optionText.includes('yardım') || optionText.includes('help')) {
-                        cardId = 'help-card';
-                    } else if (optionText.includes('çıkış') || optionText.includes('logout')) {
-                        // Çıkış işlemi
-                        showToast('Çıkış yapıldı', 'info');
-                        setTimeout(() => {
-                            openAuthModal();
-                        }, 500);
-                    }
-
-                    // Profil menüsünü kapat
-                    if (profileMenu) {
-                        profileMenu.classList.remove('show');
-                    }
-
-                    // İlgili kartı aç
-                    if (cardId) {
-                        openProfileCard(cardId);
-                    }
-                });
-            });
-        }
-
-        // Kart kapatma butonları
-        if (closeProfileBtns) {
-            closeProfileBtns.forEach(btn => {
-                btn.addEventListener('click', closeProfileCard);
-            });
-        }
-
-        // Overlay'e tıklayınca kartı kapat
-        if (profileCardOverlay) {
-            profileCardOverlay.addEventListener('click', function (e) {
-                if (e.target === this) {
-                    closeProfileCard();
-                }
-            });
-        }
-
-        // Yardım sekmelerini değiştir
-        if (helpTabs) {
-            helpTabs.forEach(tab => {
-                tab.addEventListener('click', function () {
-                    const targetTab = this.dataset.tab;
-
-                    // Aktif sekmeyi değiştir
-                    helpTabs.forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
-
-                    // İlgili içeriği göster
-                    if (helpContents) {
-                        helpContents.forEach(content => content.classList.remove('active'));
-                        const targetContent = document.getElementById(`${targetTab}-content`);
-                        if (targetContent) {
-                            targetContent.classList.add('active');
-                        }
-                    }
-                });
-            });
-        }
-
-        // SSS akordiyon
-        if (faqItems) {
-            faqItems.forEach(item => {
-                const question = item.querySelector('.faq-question');
-
-                if (question) {
-                    question.addEventListener('click', function () {
-                        item.classList.toggle('active');
-                    });
-                }
-            });
-        }
-
-        // Tercihler formunu kaydet
-        const preferencesForm = document.querySelector('.preferences-save-btn');
-        if (preferencesForm) {
-            preferencesForm.addEventListener('click', function () {
-                // Burada normalde tercihler kaydedilir
-                showToast('Tercihler kaydedildi', 'success');
-            });
-        }
-
-        // Profil formunu kaydet
-        const profileForm = document.getElementById('profile-form');
-        if (profileForm) {
-            profileForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                // Burada normalde profil bilgileri güncellenir
-                showToast('Profil bilgileriniz güncellendi', 'success');
-            });
-        }
-
-        // İletişim formunu gönder
-        const contactSubmitBtn = document.querySelector('.contact-submit-btn');
-        if (contactSubmitBtn) {
-            contactSubmitBtn.addEventListener('click', function () {
-                // Burada normalde form gönderilir
-                showToast('Mesajınız gönderildi', 'success');
-
-                // Formu temizle
-                const nameInput = document.getElementById('contact-name');
-                const emailInput = document.getElementById('contact-email');
-                const messageInput = document.getElementById('contact-message');
-
-                if (nameInput) nameInput.value = '';
-                if (emailInput) emailInput.value = '';
-                if (messageInput) messageInput.value = '';
             });
         }
     }
 
+    // Kullanıcı kayıt formu işlevi
+    function setupRegisterForm() {
+        const registerForm = document.getElementById('register-form');
+        if (registerForm) {
+            registerForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const name = document.getElementById('name').value;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirm-password').value;
+
+                if (!name || !email || !password) {
+                    showToast('Tüm alanlar gerekli', 'error');
+                    return;
+                }
+
+                if (password !== confirmPassword) {
+                    showToast('Şifreler eşleşmiyor', 'error');
+                    return;
+                }
+
+                const registerButton = document.getElementById('register-btn');
+                registerButton.disabled = true;
+                registerButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kayıt olunuyor...';
+
+                const success = await register(name, email, password);
+
+                if (success) {
+                    // Ana sayfaya yönlendir
+                    window.location.href = '/';
+                } else {
+                    registerButton.disabled = false;
+                    registerButton.innerHTML = 'Kayıt Ol';
+                }
+            });
+        }
+    }
+
+    // Eğer sayfada giriş/kayıt formu varsa, onları ayarla
+    setupLoginForm();
+    setupRegisterForm();
+
     // Uygulama başladığında
     showAppLoading();
     initializeApp();
-
-    // Toast bildirimi fonksiyonunu global yap
-    window.showToast = showToast;
-
-    // sendMessage fonksiyonunu global yap (ses bildirimlerinde kullanım için)
-    window.sendMessage = sendMessage;
-
-    console.log("Tüm JS kodları yüklendi");
 });
+
+// Toast bildirimi fonksiyonunu global yap
+window.showToast = function (message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    let icon = 'info-circle';
+    if (type === 'success') icon = 'check-circle';
+    if (type === 'error') icon = 'exclamation-circle';
+    if (type === 'warning') icon = 'exclamation-triangle';
+
+    toast.innerHTML = `
+        <div class="toast-icon"><i class="fas fa-${icon}"></i></div>
+        <div class="toast-message">${message}</div>
+        <button class="toast-close"><i class="fas fa-times"></i></button>
+    `;
+
+    // Toast konteyneri oluştur veya mevcut olanı kullan
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Toastı ekle
+    toastContainer.appendChild(toast);
+
+    // Kapatma butonu
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.addEventListener('click', function () {
+        toast.remove();
+    });
+
+    // Otomatik kapat
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+};
+
+// sendMessage fonksiyonunu global yap (ses bildirimlerinde kullanım için)
+window.sendMessage = sendMessage;
