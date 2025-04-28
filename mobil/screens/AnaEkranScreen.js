@@ -6,7 +6,7 @@ import {
     StyleSheet,
     SafeAreaView,
     TextInput,
-    ScrollView,
+    FlatList,
     StatusBar,
     Modal,
     Keyboard,
@@ -16,7 +16,8 @@ import {
     Dimensions,
     Alert,
     Clipboard,
-    FlatList
+    RefreshControl,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import GeminiService from '../services/GeminiService';
@@ -26,21 +27,31 @@ import * as FileSystem from 'expo-file-system';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import { AppContext } from '../context/AppContext';
-import { CommonActions } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
+import { showInfoAlert, showDeleteConfirm } from '../utils/AlertManager';
 
 const { width, height } = Dimensions.get('window');
 
 export default function AnaEkranScreen({ navigation }) {
-    const { userName } = useContext(AppContext);
+    const {
+        userName,
+        getColors,
+        t,
+        language,
+        theme,
+        chatHistory,
+        addChat,
+        addMessageToChat,
+        deleteChat
+    } = useContext(AppContext);
+
+    const colors = getColors();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [activeSohbet, setActiveSohbet] = useState(null);
     const [yeniSohbetModalGorunur, setYeniSohbetModalGorunur] = useState(false);
     const [sohbetBasligi, setSohbetBasligi] = useState('');
-    const [sonSohbetler, setSonSohbetler] = useState([
-        { id: 1, baslik: 'Yazılım Geliştirme Soruları', lastMessageTime: '10:45' },
-        { id: 2, baslik: 'Proje Yardımı', lastMessageTime: 'Dün' },
-        { id: 3, baslik: 'Rapor Hazırlama', lastMessageTime: 'Salı' }
-    ]);
+    const [sonSohbetler, setSonSohbetler] = useState([]);
     const [sohbetMesajlari, setSohbetMesajlari] = useState([
         { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Bugün size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
     ]);
@@ -50,9 +61,101 @@ export default function AnaEkranScreen({ navigation }) {
     const [recording, setRecording] = useState(null);
     const [selectedFile, setSelectedFile] = useState(null);
     const [fileModalVisible, setFileModalVisible] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [filteredSohbetler, setFilteredSohbetler] = useState([]);
 
     const scrollViewRef = useRef();
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(50)).current;
+
+    // Dil bazlı öneriler listesi
+    const getLangBasedSuggestions = (currentLang) => {
+        switch (currentLang) {
+            case 'en':
+                return [
+                    "How can I be more productive today?",
+                    "Tell me about photo editing techniques",
+                    "How to add animations in React Native?",
+                    "Recommend a movie to watch this week",
+                    "What are the best tools for web development?",
+                    "How does artificial intelligence work?",
+                    "How to analyze data in Python?",
+                    "What are the best vacation spots in the world?"
+                ];
+            case 'fr':
+                return [
+                    "Comment puis-je être plus productif aujourd'hui?",
+                    "Parlez-moi des techniques de retouche photo",
+                    "Comment ajouter des animations dans React Native?",
+                    "Recommandez-moi un film à regarder cette semaine",
+                    "Quels sont les meilleurs outils pour le développement web?",
+                    "Comment fonctionne l'intelligence artificielle?",
+                    "Comment analyser des données en Python?",
+                    "Quels sont les meilleurs lieux de vacances en France?"
+                ];
+            default: // 'tr' ve diğerleri
+                return [
+                    "Bugün nasıl daha verimli çalışabilirim?",
+                    "Fotoğraf düzenleme teknikleri hakkında bilgi verir misin?",
+                    "React Native ile nasıl animasyon eklenir?",
+                    "Bu hafta izlemem gereken bir film öner",
+                    "Web geliştirme için en iyi araçlar nelerdir?",
+                    "Yapay zeka nasıl çalışır?",
+                    "Python'da veri analizi nasıl yapılır?",
+                    "Türkiye'nin en güzel tatil yerleri hangileri?"
+                ];
+        }
+    };
+
+    const [oneriler, setOneriler] = useState(getLangBasedSuggestions(language));
+
+    // Sohbetleri yükle
+    useFocusEffect(
+        React.useCallback(() => {
+            // Ekran her odaklandığında çalışacak kod
+            setSonSohbetler(chatHistory);
+            setFilteredSohbetler(chatHistory);
+
+            // Animasyon
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 400,
+                    useNativeDriver: true
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 500,
+                    useNativeDriver: true
+                })
+            ]).start();
+
+            return () => {
+                // Ekrandan çıkınca çalışacak temizlik kodu
+                fadeAnim.setValue(0);
+                slideAnim.setValue(50);
+            };
+        }, [chatHistory])
+    );
+
+    // Language değiştiğinde önerileri güncelle
+    useEffect(() => {
+        setOneriler(getLangBasedSuggestions(language));
+    }, [language]);
+
+    // Arama metni değiştiğinde filtreleme
+    useEffect(() => {
+        if (!searchQuery) {
+            setFilteredSohbetler(sonSohbetler);
+            return;
+        }
+
+        const filtered = sonSohbetler.filter(sohbet =>
+            sohbet.baslik.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setFilteredSohbetler(filtered);
+    }, [searchQuery, sonSohbetler]);
 
     // Animasyonlu mikrofon pulse efekti
     useEffect(() => {
@@ -81,6 +184,12 @@ export default function AnaEkranScreen({ navigation }) {
         const loadChatHistory = async () => {
             if (activeSohbet) {
                 await GeminiService.loadHistory();
+
+                // Sohbet mesajlarını ayarla
+                const activeChat = chatHistory.find(chat => chat.id === activeSohbet.id);
+                if (activeChat && activeChat.messages) {
+                    setSohbetMesajlari(activeChat.messages);
+                }
             }
         };
 
@@ -93,7 +202,7 @@ export default function AnaEkranScreen({ navigation }) {
             try {
                 const { status } = await Audio.requestPermissionsAsync();
                 if (status !== 'granted') {
-                    alert('Sesli asistan için mikrofon izni gereklidir!');
+                    showInfoAlert('Sesli asistan için mikrofon izni gereklidir!');
                 }
             } catch (error) {
                 console.log('Mikrofon izni alınırken hata:', error);
@@ -102,40 +211,52 @@ export default function AnaEkranScreen({ navigation }) {
 
         requestPermissions();
     }, []);
+    // chatHistory güncellendiğinde aktif sohbetin referansını yenile
+    useEffect(() => {
+        if (activeSohbet) {
+            const guncel = chatHistory.find(c => c.id === activeSohbet.id);
+            if (guncel) {
+                setActiveSohbet(guncel);   // aynı ID’li fakat güncel “messages” dizisi
+            }
+        }
+    }, [chatHistory]);   // ← sadece chatHistory değişince çalışır
 
     const hizliIslemler = [
         {
             icon: 'chatbubble-outline',
-            baslik: 'Yeni Sohbet',
+            baslik: t('newChat'),
             onPress: () => setYeniSohbetModalGorunur(true)
         },
         {
             icon: 'document-outline',
-            baslik: 'Dosya Yükle',
+            baslik: t('uploadFile'),
             onPress: selectDocument
         },
         {
             icon: 'mic-outline',
-            baslik: 'Sesli Komut',
+            baslik: t('voiceCommand'),
             onPress: toggleRecording
         },
         {
             icon: 'bookmarks-outline',
-            baslik: 'Kayıtlı Sohbetler',
+            baslik: t('savedChats'),
             onPress: () => showSavedChats()
         }
     ];
 
-    const oneriler = [
-        "Bugün nasıl verimli çalışabilirim?",
-        "Fotoğraf düzenleme hakkında bilgi verir misin?",
-        "React Native ile nasıl animasyon eklenir?",
-        "Bu hafta izlemem gereken bir film öner",
-        "Web geliştirme için en iyi araçlar nelerdir?",
-        "Yapay zeka nasıl çalışır?",
-        "Python'da veri analizi nasıl yapılır?",
-        "Türkiye'nin en güzel tatil yerleri hangileri?"
-    ];
+    // Yenileme işlemi
+    const onRefresh = React.useCallback(() => {
+        setRefreshing(true);
+
+        // Sohbetleri yeniden yükle
+        setSonSohbetler(chatHistory);
+        setFilteredSohbetler(chatHistory);
+
+        // 1 saniye sonra yenileme durumunu kapat
+        setTimeout(() => {
+            setRefreshing(false);
+        }, 1000);
+    }, [chatHistory]);
 
     // Drawer'ı açmak için
     const openDrawer = () => {
@@ -143,12 +264,6 @@ export default function AnaEkranScreen({ navigation }) {
             navigation.openDrawer();
         } else {
             console.log("Drawer navigatoru bulunamadı");
-            // Drawer yoksa Main'e yönlendir
-            navigation.dispatch(
-                CommonActions.navigate({
-                    name: 'Main'
-                })
-            );
         }
     };
 
@@ -175,7 +290,7 @@ export default function AnaEkranScreen({ navigation }) {
             }
         } catch (error) {
             console.error('Dosya seçilirken hata:', error);
-            alert('Dosya seçilemedi.');
+            showInfoAlert('Dosya seçilemedi.');
         }
     }
 
@@ -199,30 +314,42 @@ export default function AnaEkranScreen({ navigation }) {
             // Dosya analiz sonucunu sohbet olarak ekle
             const fileMessage = `📄 [${selectedFile.name}] dosyasını analiz edebilir misin?`;
 
-            const yeniMesajlar = [
-                ...sohbetMesajlari,
-                { id: Date.now(), metin: fileMessage, gonderen: 'kullanici' },
-                { id: Date.now() + 1, metin: response, gonderen: 'ai' }
-            ];
+            const messageId = Date.now();
+            const responseId = messageId + 1;
 
-            setSohbetMesajlari(yeniMesajlar);
+            const newMessages = [
+                { id: messageId, metin: fileMessage, gonderen: 'kullanici' },
+                { id: responseId, metin: response, gonderen: 'ai' }
+            ];
 
             // Eğer aktif sohbet yoksa, dosya ismiyle yeni bir sohbet oluştur
             if (!activeSohbet) {
+                const newChatId = Date.now();
                 const yeniSohbet = {
-                    id: Date.now(),
+                    id: newChatId,
                     baslik: `${selectedFile.name} Analizi`,
-                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                    messages: [
+                        { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Dosya analizi için size nasıl yardımcı olabilirim?`, gonderen: 'ai' },
+                        ...newMessages
+                    ]
                 };
 
-                setSonSohbetler(prev => [yeniSohbet, ...prev]);
+                await addChat(yeniSohbet);
                 setActiveSohbet(yeniSohbet);
+                setSohbetMesajlari(yeniSohbet.messages);
+            } else {
+                // Var olan sohbete mesajları ekle
+                await addMessageToChat(activeSohbet.id, newMessages[0]);
+                await addMessageToChat(activeSohbet.id, newMessages[1]);
+
+                setSohbetMesajlari(prev => [...prev, ...newMessages]);
             }
 
             setSelectedFile(null);
         } catch (error) {
             console.error('Dosya analizi sırasında hata:', error);
-            alert('Dosya analiz edilemedi.');
+            showInfoAlert('Dosya analiz edilemedi.');
         } finally {
             setIsLoading(false);
         }
@@ -255,7 +382,7 @@ export default function AnaEkranScreen({ navigation }) {
             setIsRecording(true);
         } catch (error) {
             console.error('Ses kaydı başlatılamadı:', error);
-            alert('Ses kaydı başlatılamadı.');
+            showInfoAlert('Ses kaydı başlatılamadı.');
         }
     }
 
@@ -274,13 +401,37 @@ export default function AnaEkranScreen({ navigation }) {
             // Şimdilik basit bir mesaj göndereceğiz
             const message = "🎤 [Sesli Mesaj]";
 
-            const yeniMesajlar = [
-                ...sohbetMesajlari,
-                { id: Date.now(), metin: message, gonderen: 'kullanici' },
-                { id: Date.now() + 1, metin: "Sesli mesajınızı aldım, ancak şu an sesli komutları işleme özelliği henüz geliştirilme aşamasında. Lütfen yazılı olarak nasıl yardımcı olabileceğimi belirtin.", gonderen: 'ai' }
+            const messageId = Date.now();
+            const responseId = messageId + 1;
+
+            const newMessages = [
+                { id: messageId, metin: message, gonderen: 'kullanici' },
+                { id: responseId, metin: "Sesli mesajınızı aldım, ancak şu an sesli komutları işleme özelliği henüz geliştirilme aşamasında. Lütfen yazılı olarak nasıl yardımcı olabileceğimi belirtin.", gonderen: 'ai' }
             ];
 
-            setSohbetMesajlari(yeniMesajlar);
+            // Eğer aktif sohbet yoksa, yeni bir sohbet oluştur
+            if (!activeSohbet) {
+                const newChatId = Date.now();
+                const yeniSohbet = {
+                    id: newChatId,
+                    baslik: "Sesli Komut",
+                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                    messages: [
+                        { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`, gonderen: 'ai' },
+                        ...newMessages
+                    ]
+                };
+
+                await addChat(yeniSohbet);
+                setActiveSohbet(yeniSohbet);
+                setSohbetMesajlari(yeniSohbet.messages);
+            } else {
+                // Var olan sohbete mesajları ekle
+                await addMessageToChat(activeSohbet.id, newMessages[0]);
+                await addMessageToChat(activeSohbet.id, newMessages[1]);
+
+                setSohbetMesajlari(prev => [...prev, ...newMessages]);
+            }
         } catch (error) {
             console.error('Ses kaydı durdurulurken hata:', error);
         }
@@ -288,25 +439,30 @@ export default function AnaEkranScreen({ navigation }) {
 
     // Kayıtlı sohbetleri göster
     function showSavedChats() {
+        if (sonSohbetler.length === 0) {
+            showInfoAlert("Henüz kayıtlı sohbet bulunmuyor.");
+            return;
+        }
+
         Alert.alert(
-            "Kayıtlı Sohbetler",
-            "Sohbet arşivinizi görüntüleyin ve yönetin",
+            t("savedChats"),
+            t("manageSavedChats"),
             [
                 {
-                    text: "Tüm Sohbetler",
+                    text: t("allChats"),
                     onPress: () => {
                         // Burada ileride tüm sohbetler ekranını gösterebilirsiniz
-                        Alert.alert("Bilgi", "Bu özellik yakında eklenecek!");
+                        showInfoAlert("Bu özellik yakında eklenecek!");
                     }
                 },
                 {
-                    text: "Favoriler",
+                    text: t("favorites"),
                     onPress: () => {
-                        Alert.alert("Bilgi", "Favori sohbetler özelliği geliştiriliyor!");
+                        showInfoAlert("Favori sohbetler özelliği geliştiriliyor!");
                     }
                 },
                 {
-                    text: "İptal",
+                    text: t("cancel"),
                     style: "cancel"
                 }
             ]
@@ -317,7 +473,7 @@ export default function AnaEkranScreen({ navigation }) {
     function speakMessage(message) {
         try {
             Speech.speak(message, {
-                language: 'tr',
+                language: language,
                 pitch: 1.0,
                 rate: 0.9
             });
@@ -326,21 +482,30 @@ export default function AnaEkranScreen({ navigation }) {
         }
     }
 
-    const sohbetBaslat = () => {
+    const sohbetBaslat = async () => {
         if (sohbetBasligi.trim()) {
+            const newChatId = Date.now();
             const yeniSohbet = {
-                id: Date.now(),
+                id: newChatId,
                 baslik: sohbetBasligi,
-                lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                messages: [
+                    { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Yeni bir sohbet başlattınız. Size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
+                ]
             };
-            // Yeni sohbeti listenin başına ekle
-            setSonSohbetler([yeniSohbet, ...sonSohbetler]);
 
-            setActiveSohbet(yeniSohbet);
+            // Sohbeti context'e ekle
+            await addChat(yeniSohbet);
+
+            // UI güncellemeleri
             setYeniSohbetModalGorunur(false);
             setSohbetBasligi('');
 
-            // GeminiService'i kontrol et ve temizlemeyi dene
+            // BURASI ÖNEMLİ: Önce sohbet mesajlarını ayarla, sonra aktif sohbeti
+            setSohbetMesajlari(yeniSohbet.messages);
+            setActiveSohbet(yeniSohbet); // openChat yerine doğrudan setActiveSohbet kullanın
+
+            // GeminiService geçmişini temizle
             try {
                 if (GeminiService && typeof GeminiService.clearHistory === 'function') {
                     GeminiService.clearHistory();
@@ -348,62 +513,124 @@ export default function AnaEkranScreen({ navigation }) {
             } catch (error) {
                 console.log('GeminiService.clearHistory çağrısında hata:', error);
             }
-
-            setSohbetMesajlari([
-                { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Yeni bir sohbet başlattınız. Size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
-            ]);
         }
     };
 
+    const openChat = (sohbet) => {
+        if (!sohbet) return; // Null check ekleyin
+
+        // Sohbetin tüm mesajlarını doğru şekilde yükle
+        if (sohbet.messages && sohbet.messages.length > 0) {
+            setSohbetMesajlari([...sohbet.messages]); // Array'i doğru şekilde kopyala
+        } else {
+            // Eğer mesaj yoksa, başlangıç mesajını göster
+            setSohbetMesajlari([
+                { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
+            ]);
+        }
+
+        // Sohbeti aktif olarak ayarla
+        setActiveSohbet(sohbet);
+
+        // GeminiService geçmişini yükle
+        try {
+            if (GeminiService && typeof GeminiService.loadHistory === 'function') {
+                GeminiService.loadHistory();
+            }
+        } catch (error) {
+            console.log('GeminiService.loadHistory çağrısında hata:', error);
+        }
+    };
+
+
     const mesajGonder = async () => {
-        if (mevcutMesaj.trim() === '') return;
+        // 0) Boş mesaj gönderme
+        if (!mevcutMesaj.trim()) return;
 
         Keyboard.dismiss();
         setIsLoading(true);
 
-        // Kullanıcı mesajı
-        const kullaniciMesaji = mevcutMesaj;
-        setMevcutMesaj('');
-
-        // Kullanıcı mesajını ekranına ekle
-        const yeniMesajlar = [
-            ...sohbetMesajlari,
-            { id: Date.now(), metin: kullaniciMesaji, gonderen: 'kullanici' }
-        ];
-        setSohbetMesajlari(yeniMesajlar);
+        // 1) Kullanıcı mesajı nesnesi
+        const userMsg = {
+            id: Date.now(),
+            metin: mevcutMesaj.trim(),
+            gonderen: 'kullanici',
+        };
+        setMevcutMesaj('');                       // input’u temizle
 
         try {
-            // AI yanıtını al
-            const aiYaniti = await GeminiService.generateText(kullaniciMesaji);
+            // 2) Aktif sohbet VAR mı YOK mu?
+            let chat = activeSohbet;
 
-            // AI yanıtını ekrana ekle
-            setSohbetMesajlari(prevMesajlar => [
-                ...prevMesajlar,
-                { id: Date.now(), metin: aiYaniti, gonderen: 'ai' }
-            ]);
+            if (!chat) {
+                // • İlk mesaj → yeni sohbet oluştur
+                chat = {
+                    id: Date.now(),
+                    baslik: userMsg.metin.length > 25
+                        ? userMsg.metin.slice(0, 22) + '...'
+                        : userMsg.metin,
+                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                    messages: [
+                        {
+                            id: 1,
+                            metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`,
+                            gonderen: 'ai',
+                        },
+                        userMsg,
+                    ],
+                };
 
-            // Sohbetler listesini güncelle - zaman bilgisiyle
-            if (activeSohbet) {
-                setSonSohbetler(prevSohbetler => {
-                    const guncellenmisListe = prevSohbetler.map(sohbet =>
-                        sohbet.id === activeSohbet.id
-                            ? { ...sohbet, lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) }
-                            : sohbet
-                    );
-                    return guncellenmisListe;
-                });
+                await addChat(chat);              // context’e kaydet
+                setActiveSohbet(chat);            // UI’de seç
+                setSohbetMesajlari(chat.messages);
+            } else {
+                // • Mevcut sohbete ekle
+                await addMessageToChat(chat.id, userMsg);
+
+                // UI senkronu
+                setSohbetMesajlari(prev => [...prev, userMsg]);
+                setActiveSohbet(prev => ({
+                    ...prev,
+                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                    messages: [...prev.messages, userMsg],
+                }));
             }
-        } catch (error) {
-            console.error('API çağrısı sırasında hata:', error);
-            // Hata durumunda kullanıcıya bilgi ver
-            setSohbetMesajlari(prevMesajlar => [
-                ...prevMesajlar,
-                { id: Date.now(), metin: "Üzgünüm, bir sorun oluştu. Lütfen tekrar deneyin.", gonderen: 'ai' }
-            ]);
-        } finally {
+
+            // 3) Gemini API → AI yanıtı
+            const yanit = await GeminiService.generateText(userMsg.metin);
+            const aiMsg = {
+                id: Date.now() + 1,              // basit id
+                metin: yanit,
+                gonderen: 'ai',
+            };
+
+            await addMessageToChat(chat.id, aiMsg);
+
+            // UI senkronu
+            setSohbetMesajlari(prev => [...prev, aiMsg]);
+            setActiveSohbet(prev => ({
+                ...prev,
+                messages: [...prev.messages, aiMsg],
+            }));
+        }
+        catch (err) {
+            console.error('mesajGonder hatası:', err);
+
+            const errorMsg = {
+                id: Date.now() + 2,
+                metin: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.',
+                gonderen: 'ai',
+            };
+            if (activeSohbet) {
+                await addMessageToChat(activeSohbet.id, errorMsg);
+            }
+            setSohbetMesajlari(prev => [...prev, errorMsg]);
+        }
+        finally {
             setIsLoading(false);
         }
     };
+
 
     // Önerilen mesajı gönder
     const oneriGonder = (oneri) => {
@@ -411,55 +638,43 @@ export default function AnaEkranScreen({ navigation }) {
 
         // Eğer aktif sohbet yoksa, önce yeni bir sohbet oluştur
         if (!activeSohbet) {
-            const yeniSohbet = {
-                id: Date.now(),
-                baslik: oneri.length > 25 ? oneri.substring(0, 22) + "..." : oneri,
-                lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-            };
-
-            setSonSohbetler([yeniSohbet, ...sonSohbetler]);
-            setActiveSohbet(yeniSohbet);
-
-            // Yeni bir sohbet başlatıldığında gemini history'i temizle
-            try {
-                if (GeminiService && typeof GeminiService.clearHistory === 'function') {
-                    GeminiService.clearHistory();
-                }
-            } catch (error) {
-                console.log('GeminiService.clearHistory çağrısında hata:', error);
-            }
-
-            setSohbetMesajlari([
-                { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
-            ]);
+            // otomatik olarak mesajı gönder
+            setTimeout(() => {
+                mesajGonder();
+            }, 300);
+        } else {
+            // otomatik olarak mesajı gönder
+            setTimeout(() => {
+                mesajGonder();
+            }, 300);
         }
-
-        // otomatik olarak mesajı gönder
-        setTimeout(() => {
-            mesajGonder();
-        }, 300);
     };
 
     // Profil ekranına git
     const goToProfile = () => {
-        if (navigation.navigate) {
-            navigation.navigate('Profil');
-        } else {
-            navigation.dispatch(
-                CommonActions.navigate({
-                    name: 'Profil'
-                })
-            );
-        }
+        navigation.navigate('Profil');
+    };
+
+    // Sohbeti sil
+    const confirmDeleteChat = (chatId) => {
+        showDeleteConfirm(t('chat'), async () => {
+            if (activeSohbet && activeSohbet.id === chatId) {
+                setActiveSohbet(null);
+                setSohbetMesajlari([
+                    { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Bugün size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
+                ]);
+            }
+            await deleteChat(chatId);
+        });
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar backgroundColor="#8A2BE2" barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar backgroundColor={colors.statusBar} barStyle="light-content" />
 
             {/* Üst Navigasyon - Aktif sohbet yoksa */}
             {!activeSohbet && (
-                <View style={styles.ustNavigation}>
+                <View style={[styles.ustNavigation, { backgroundColor: colors.primary }]}>
                     <TouchableOpacity
                         style={styles.menuButon}
                         onPress={openDrawer}
@@ -484,27 +699,27 @@ export default function AnaEkranScreen({ navigation }) {
                 onRequestClose={() => setYeniSohbetModalGorunur(false)}
             >
                 <View style={styles.modalArkaPlan}>
-                    <View style={styles.modalIcerik}>
-                        <Text style={styles.modalBaslik}>Yeni Sohbet Başlat</Text>
+                    <View style={[styles.modalIcerik, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.modalBaslik, { color: colors.text }]}>{t('newChat')}</Text>
                         <TextInput
-                            style={styles.modalInput}
-                            placeholder="Sohbet başlığını girin"
-                            placeholderTextColor="#888"
+                            style={[styles.modalInput, { backgroundColor: colors.background, color: colors.text }]}
+                            placeholder={t('chatTitle')}
+                            placeholderTextColor={colors.textSecondary}
                             value={sohbetBasligi}
                             onChangeText={setSohbetBasligi}
                         />
                         <View style={styles.modalButonlar}>
                             <TouchableOpacity
-                                style={styles.modalIptalButon}
+                                style={[styles.modalIptalButon, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}
                                 onPress={() => setYeniSohbetModalGorunur(false)}
                             >
-                                <Text style={styles.modalIptalMetin}>İptal</Text>
+                                <Text style={[styles.modalIptalMetin, { color: colors.text }]}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={styles.modalOnayButon}
+                                style={[styles.modalOnayButon, { backgroundColor: colors.primary }]}
                                 onPress={sohbetBaslat}
                             >
-                                <Text style={styles.modalOnayMetin}>Başlat</Text>
+                                <Text style={styles.modalOnayMetin}>{t('start')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -519,29 +734,29 @@ export default function AnaEkranScreen({ navigation }) {
                 onRequestClose={() => setFileModalVisible(false)}
             >
                 <View style={styles.modalArkaPlan}>
-                    <View style={styles.modalIcerik}>
-                        <Text style={styles.modalBaslik}>Dosya Yüklendi</Text>
-                        <View style={styles.fileInfo}>
-                            <Ionicons name="document" size={24} color="#8A2BE2" />
-                            <Text style={styles.fileName}>
-                                {selectedFile?.name || "Dosya"}
+                    <View style={[styles.modalIcerik, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.modalBaslik, { color: colors.text }]}>{t('fileUploaded')}</Text>
+                        <View style={[styles.fileInfo, { backgroundColor: colors.background }]}>
+                            <Ionicons name="document" size={24} color={colors.primary} />
+                            <Text style={[styles.fileName, { color: colors.text }]}>
+                                {selectedFile?.name || t('file')}
                             </Text>
                         </View>
-                        <Text style={styles.modalText}>
-                            Dosyayı analiz etmek ister misiniz?
+                        <Text style={[styles.modalText, { color: colors.text }]}>
+                            {t('analyzeFileQuestion')}
                         </Text>
                         <View style={styles.modalButonlar}>
                             <TouchableOpacity
-                                style={styles.modalIptalButon}
+                                style={[styles.modalIptalButon, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}
                                 onPress={() => setFileModalVisible(false)}
                             >
-                                <Text style={styles.modalIptalMetin}>İptal</Text>
+                                <Text style={[styles.modalIptalMetin, { color: colors.text }]}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={styles.modalOnayButon}
+                                style={[styles.modalOnayButon, { backgroundColor: colors.primary }]}
                                 onPress={analyzeFile}
                             >
-                                <Text style={styles.modalOnayMetin}>Analiz Et</Text>
+                                <Text style={styles.modalOnayMetin}>{t('analyze')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -551,116 +766,158 @@ export default function AnaEkranScreen({ navigation }) {
             {!activeSohbet ? (
                 <View style={styles.icerikAlani}>
                     {/* Arama Çubuğu */}
-                    <View style={styles.aramaKutusu}>
-                        <Ionicons name="search" size={20} color="#888" style={styles.aramaIconu} />
+                    <View style={[styles.aramaKutusu, { backgroundColor: colors.card }]}>
+                        <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.aramaIconu} />
                         <TextInput
-                            style={styles.aramaInput}
-                            placeholder="Sohbetlerde ara..."
-                            placeholderTextColor="#888"
+                            style={[styles.aramaInput, { color: colors.text }]}
+                            placeholder={t('searchChats')}
+                            placeholderTextColor={colors.textSecondary}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
-                    </View>
-
-                    {/* Hızlı İşlemler */}
-                    <View style={styles.bolumBaslik}>
-                        <Text style={styles.bolumBaslikMetni}>Hızlı İşlemler</Text>
-                    </View>
-                    <View style={{ height: 100 }}>
-                        <FlatList
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            data={hizliIslemler}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={styles.hizliIslemButonu}
-                                    onPress={item.onPress}
-                                >
-                                    {item.baslik === 'Sesli Komut' && isRecording ? (
-                                        <Animated.View style={{
-                                            transform: [{ scale: pulseAnim }]
-                                        }}>
-                                            <Ionicons name="mic" size={28} color="#FF4757" />
-                                        </Animated.View>
-                                    ) : (
-                                        <Ionicons name={item.icon} size={24} color="#8A2BE2" />
-                                    )}
-                                    <Text style={styles.hizliIslemMetni}>{item.baslik}</Text>
-                                </TouchableOpacity>
-                            )}
-                            keyExtractor={(item, index) => index.toString()}
-                            contentContainerStyle={styles.hizliIslemlerScroll}
-                        />
-                    </View>
-
-                    {/* Öneri Kartları */}
-                    <View style={styles.bolumBaslik}>
-                        <Text style={styles.bolumBaslikMetni}>Neler Sorabilirsiniz?</Text>
-                    </View>
-                    <View style={{ height: 140 }}>
-                        <FlatList
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            data={oneriler}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={styles.oneriKarti}
-                                    onPress={() => oneriGonder(item)}
-                                >
-                                    <Text style={styles.oneriMetni}>{item}</Text>
-                                    <View style={styles.oneriIconContainer}>
-                                        <Ionicons name="arrow-forward-circle" size={24} color="#8A2BE2" />
-                                    </View>
-                                </TouchableOpacity>
-                            )}
-                            keyExtractor={(item, index) => index.toString()}
-                            contentContainerStyle={styles.oneriScroll}
-                        />
-                    </View>
-
-                    {/* Son Sohbetler */}
-                    <View style={styles.bolumBaslik}>
-                        <Text style={styles.bolumBaslikMetni}>Son Sohbetler</Text>
-                    </View>
-                    {sonSohbetler.length > 0 ? (
-                        sonSohbetler.map((sohbet) => (
+                        {searchQuery ? (
                             <TouchableOpacity
-                                key={sohbet.id}
-                                style={styles.sohbetOgesi}
-                                onPress={() => setActiveSohbet(sohbet)}
+                                onPress={() => setSearchQuery('')}
+                                style={styles.clearButton}
                             >
-                                <Ionicons name="chatbubble-outline" size={24} color="#8A2BE2" />
-                                <View style={styles.sohbetBilgi}>
-                                    <Text style={styles.sohbetMetni}>{sohbet.baslik}</Text>
-                                    <Text style={styles.sohbetZaman}>{sohbet.lastMessageTime}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={24} color="#666" />
+                                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
                             </TouchableOpacity>
-                        ))
-                    ) : (
-                        <View style={styles.bosSohbetContainer}>
-                            <Image
-                                source={require('../assets/empty-chat.png')}
-                                style={styles.bosSohbetResim}
+                        ) : null}
+                    </View>
+
+                    {/* Ana içerik alanı - Yenileme ile */}
+                    <FlatList
+                        data={[1]} // Tek elemanla listeyi temsil et
+                        keyExtractor={() => "main"}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                colors={[colors.primary]}
+                                tintColor={colors.primary}
+                                progressBackgroundColor={colors.card}
                             />
-                            <Text style={styles.bosSohbetMetin}>
-                                Henüz sohbet bulunmuyor
-                            </Text>
-                            <TouchableOpacity
-                                style={styles.bosSohbetButon}
-                                onPress={() => setYeniSohbetModalGorunur(true)}
-                            >
-                                <Text style={styles.bosSohbetButonMetin}>
-                                    Yeni Sohbet Başlat
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                </View>
+                        }
+                        renderItem={() => (
+                            <View>
+                                {/* Hızlı İşlemler */}
+                                <View style={styles.bolumBaslik}>
+                                    <Text style={[styles.bolumBaslikMetni, { color: colors.text }]}>{t('quickActions')}</Text>
+                                </View>
+                                <View style={{ height: 100 }}>
+                                    <FlatList
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        data={hizliIslemler}
+                                        renderItem={({ item }) => (
+                                            <TouchableOpacity
+                                                style={[styles.hizliIslemButonu, { backgroundColor: colors.card }]}
+                                                onPress={item.onPress}
+                                            >
+                                                {item.baslik === t('voiceCommand') && isRecording ? (
+                                                    <Animated.View style={{
+                                                        transform: [{ scale: pulseAnim }]
+                                                    }}>
+                                                        <Ionicons name="mic" size={28} color="#FF4757" />
+                                                    </Animated.View>
+                                                ) : (
+                                                    <Ionicons name={item.icon} size={24} color={colors.primary} />
+                                                )}
+                                                <Text style={[styles.hizliIslemMetni, { color: colors.text }]}>{item.baslik}</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        keyExtractor={(item, index) => index.toString()}
+                                        contentContainerStyle={styles.hizliIslemlerScroll}
+                                    />
+                                </View>
+
+                                {/* Öneri Kartları */}
+                                <View style={styles.bolumBaslik}>
+                                    <Text style={[styles.bolumBaslikMetni, { color: colors.text }]}>{t('whatToAsk')}</Text>
+                                </View>
+                                <View style={{ height: 140 }}>
+                                    <FlatList
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        data={oneriler}
+                                        renderItem={({ item }) => (
+                                            <TouchableOpacity
+                                                style={[styles.oneriKarti, { backgroundColor: colors.card }]}
+                                                onPress={() => oneriGonder(item)}
+                                            >
+                                                <Text style={[styles.oneriMetni, { color: colors.text }]}>{item}</Text>
+                                                <View style={styles.oneriIconContainer}>
+                                                    <Ionicons name="arrow-forward-circle" size={24} color={colors.primary} />
+                                                </View>
+                                            </TouchableOpacity>
+                                        )}
+                                        keyExtractor={(item, index) => index.toString()}
+                                        contentContainerStyle={styles.oneriScroll}
+                                    />
+                                </View>
+
+                                {/* Son Sohbetler */}
+                                <View style={styles.bolumBaslik}>
+                                    <Text style={[styles.bolumBaslikMetni, { color: colors.text }]}>{t('recentChats')}</Text>
+                                </View>
+                                {filteredSohbetler.length > 0 ? (
+                                    filteredSohbetler.map((sohbet) => (
+                                        <Animated.View
+                                            key={sohbet.id}
+                                            style={[
+                                                styles.sohbetOgesi,
+                                                { backgroundColor: colors.card, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                                            ]}
+                                        >
+                                            <TouchableOpacity
+                                                style={styles.sohbetIcerik}
+                                                onPress={() => openChat(sohbet)}
+                                            >
+                                                <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
+                                                <View style={styles.sohbetBilgi}>
+                                                    <Text style={[styles.sohbetMetni, { color: colors.text }]}>{sohbet.baslik}</Text>
+                                                    <Text style={[styles.sohbetZaman, { color: colors.textSecondary }]}>{sohbet.lastMessageTime}</Text>
+                                                </View>
+                                                <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+                                            </TouchableOpacity>
+
+                                            {/* Silme butonu */}
+                                            <TouchableOpacity
+                                                style={styles.sohbetSilButton}
+                                                onPress={() => confirmDeleteChat(sohbet.id)}
+                                            >
+                                                <Ionicons name="trash-outline" size={20} color="#FF4757" />
+                                            </TouchableOpacity>
+                                        </Animated.View>
+                                    ))
+                                ) : (
+                                    <View style={styles.bosSohbetContainer}>
+                                        <Image
+                                            source={require('../assets/empty-chat.png')}
+                                            style={styles.bosSohbetResim}
+                                        />
+                                        <Text style={[styles.bosSohbetMetin, { color: colors.textSecondary }]}>
+                                            {searchQuery ? t('noSearchResults') : t('noChatsYet')}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={[styles.bosSohbetButon, { backgroundColor: colors.primary }]}
+                                            onPress={() => setYeniSohbetModalGorunur(true)}
+                                        >
+                                            <Text style={styles.bosSohbetButonMetin}>
+                                                {t('startNewChat')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+                        )
+                        }
+                    />
+                </View >
             ) : (
                 <View style={styles.sohbetEkrani}>
                     {/* Sohbet Üst Çubuğu */}
-                    <View style={styles.sohbetUstCubuk}>
+                    <View style={[styles.sohbetUstCubuk, { backgroundColor: colors.primary }]}>
                         <TouchableOpacity
                             style={styles.geriButon}
                             onPress={() => setActiveSohbet(null)}
@@ -670,72 +927,76 @@ export default function AnaEkranScreen({ navigation }) {
                         <Text style={styles.sohbetBaslikMetni}>{activeSohbet.baslik}</Text>
                         <TouchableOpacity
                             style={styles.sohbetMenuButon}
-                            onPress={() => Alert.alert('Bilgi', 'Sohbet menüsü yakında eklenecek')}
+                            onPress={() => confirmDeleteChat(activeSohbet.id)}
                         >
-                            <Ionicons name="ellipsis-vertical" size={24} color="#FFFFFF" />
+                            <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
                         </TouchableOpacity>
                     </View>
 
                     {/* Sohbet Mesajları */}
-                    <ScrollView
+                    <FlatList
                         style={styles.sohbetMesajlari}
+                        data={sohbetMesajlari}
                         ref={scrollViewRef}
-                        onContentSizeChange={() => scrollViewRef.current.scrollToEnd({ animated: true })}
-                    >
-                        {sohbetMesajlari.map((mesaj) => (
+                        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+                        renderItem={({ item: mesaj }) => (
                             <View
-                                key={mesaj.id}
                                 style={[
                                     styles.mesajKutusu,
-                                    mesaj.gonderen === 'ai' ? styles.aiMesaji : styles.kullaniciMesaji
+                                    mesaj.gonderen === 'ai'
+                                        ? [styles.aiMesaji, { backgroundColor: colors.card }]
+                                        : [styles.kullaniciMesaji, { backgroundColor: colors.primary }]
                                 ]}
                             >
-                                <Text style={styles.mesajMetni}>{mesaj.metin}</Text>
+                                <Text style={[styles.mesajMetni, { color: colors.text }]}>{mesaj.metin}</Text>
                                 {mesaj.gonderen === 'ai' && (
                                     <View style={styles.mesajAletler}>
                                         <TouchableOpacity
                                             style={styles.mesajAlet}
                                             onPress={() => speakMessage(mesaj.metin)}
                                         >
-                                            <Ionicons name="volume-medium-outline" size={18} color="#888" />
+                                            <Ionicons name="volume-medium-outline" size={18} color={colors.textSecondary} />
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={styles.mesajAlet}
                                             onPress={() => {
                                                 Clipboard.setString(mesaj.metin);
-                                                Alert.alert('Bilgi', 'Mesaj panoya kopyalandı');
+                                                showInfoAlert(t('messageCopied'));
                                             }}
                                         >
-                                            <Ionicons name="copy-outline" size={18} color="#888" />
+                                            <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
                                         </TouchableOpacity>
                                     </View>
                                 )}
                             </View>
-                        ))}
-                        {isLoading && (
-                            <View style={styles.yukleniyor}>
-                                <View style={styles.yukleniyorNoktalar}>
-                                    <View style={styles.yukleniyorNokta} />
-                                    <View style={[styles.yukleniyorNokta, { marginLeft: 4 }]} />
-                                    <View style={[styles.yukleniyorNokta, { marginLeft: 4 }]} />
-                                </View>
-                            </View>
                         )}
-                    </ScrollView>
+                        keyExtractor={(mesaj) => mesaj.id.toString()}
+                        ListFooterComponent={
+                            isLoading ? (
+                                <View style={[styles.yukleniyor, { backgroundColor: colors.card }]}>
+                                    <View style={styles.yukleniyorNoktalar}>
+                                        <View style={[styles.yukleniyorNokta, { backgroundColor: colors.primary }]} />
+                                        <View style={[styles.yukleniyorNokta, { marginLeft: 4, backgroundColor: colors.primary }]} />
+                                        <View style={[styles.yukleniyorNokta, { marginLeft: 4, backgroundColor: colors.primary }]} />
+                                    </View>
+                                </View>
+                            ) : null
+                        }
+                    />
 
                     {/* Mesaj Girişi */}
-                    <View style={styles.mesajGirisi}>
+                    <View style={[styles.mesajGirisi, { backgroundColor: colors.card }]}>
                         <TouchableOpacity
                             style={styles.ekButon}
                             onPress={selectDocument}
                         >
-                            <Ionicons name="add-circle-outline" size={24} color="#8A2BE2" />
+                            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
                         </TouchableOpacity>
 
                         <TextInput
-                            style={styles.mesajInput}
-                            placeholder="Mesajınızı yazın..."
-                            placeholderTextColor="#888"
+                            style={[styles.mesajInput, { backgroundColor: colors.background, color: colors.text }]}
+                            placeholder={t('typeMessage')}
+                            placeholderTextColor={colors.textSecondary}
                             value={mevcutMesaj}
                             onChangeText={setMevcutMesaj}
                             multiline
@@ -753,7 +1014,7 @@ export default function AnaEkranScreen({ navigation }) {
                                         <Ionicons name="mic" size={24} color="#FF4757" />
                                     </Animated.View>
                                 ) : (
-                                    <Ionicons name="mic-outline" size={24} color="#8A2BE2" />
+                                    <Ionicons name="mic-outline" size={24} color={colors.primary} />
                                 )}
                             </TouchableOpacity>
                         ) : (
@@ -762,7 +1023,7 @@ export default function AnaEkranScreen({ navigation }) {
                                 onPress={mesajGonder}
                                 disabled={isLoading}
                             >
-                                <Ionicons name="send" size={24} color="#8A2BE2" />
+                                <Ionicons name="send" size={24} color={colors.primary} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -770,63 +1031,71 @@ export default function AnaEkranScreen({ navigation }) {
             )}
 
             {/* Alt Navigasyon */}
-            <View style={styles.altNavigasyon}>
+            <View style={[styles.altNavigasyon, { backgroundColor: colors.card }]}>
                 <TouchableOpacity
                     style={styles.altNavButon}
                     onPress={() => {
                         if (activeSohbet) {
                             setActiveSohbet(null);
                         } else {
-                            openDrawer();
+                            navigation.navigate('Ana Ekran');
                         }
                     }}
                 >
-                    <Ionicons name="home" size={24} color="#8A2BE2" />
-                    <Text style={[styles.altNavMetin, { color: '#8A2BE2' }]}>Ana Ekran</Text>
+                    <Ionicons name="home" size={24} color={colors.primary} />
+                    <Text style={[styles.altNavMetin, { color: colors.primary }]}>{t('home')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.altNavButon}
-                    onPress={openDrawer}
+                    onPress={() => navigation.navigate('Yardım')}
                 >
-                    <Ionicons name="menu-outline" size={24} color="#888" />
-                    <Text style={styles.altNavMetin}>Menü</Text>
+                    <Ionicons name="help-circle-outline" size={24} color={colors.textSecondary} />
+                    <Text style={[styles.altNavMetin, { color: colors.textSecondary }]}>{t('help')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.altNavButon}
-                    onPress={goToProfile}
+                    onPress={() => navigation.navigate('Profil')}
                 >
-                    <Ionicons name="person-outline" size={24} color="#888" />
-                    <Text style={styles.altNavMetin}>Profil</Text>
+                    <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+                    <Text style={[styles.altNavMetin, { color: colors.textSecondary }]}>{t('profile')}</Text>
                 </TouchableOpacity>
             </View>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
     },
     ustNavigation: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#8A2BE2',
         paddingVertical: 15,
         paddingHorizontal: 20,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
     sohbetUstCubuk: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#7209B7', // Farklı renk tonu 
         paddingVertical: 15,
         paddingHorizontal: 20,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
-        elevation: 8, // Android için gölge
-        shadowColor: '#000',  // iOS için gölge
+        borderBottomColor: 'rgba(255,255,255,0.1)',
+        elevation: 8,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
@@ -858,6 +1127,11 @@ const styles = StyleSheet.create({
     },
     menuButon: {
         width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     profilButon: {
         width: 40,
@@ -865,8 +1139,9 @@ const styles = StyleSheet.create({
     },
     baslik: {
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
+        fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
     },
     icerikAlani: {
         flex: 1,
@@ -874,18 +1149,31 @@ const styles = StyleSheet.create({
     aramaKutusu: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1E1E1E',
-        borderRadius: 10,
+        borderRadius: 12,
         margin: 15,
         paddingHorizontal: 15,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
     },
     aramaIconu: {
         marginRight: 10,
     },
     aramaInput: {
         flex: 1,
-        color: '#FFFFFF',
-        paddingVertical: 12,
+        paddingVertical: 14,
+        fontSize: 16,
+    },
+    clearButton: {
+        padding: 6,
     },
     bolumBaslik: {
         paddingHorizontal: 15,
@@ -893,7 +1181,6 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     bolumBaslikMetni: {
-        color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '600',
     },
@@ -902,49 +1189,63 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     hizliIslemButonu: {
-        backgroundColor: '#1E1E1E',
         borderRadius: 15,
         padding: 15,
         alignItems: 'center',
         marginRight: 15,
         width: 100,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 3,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     hizliIslemMetni: {
-        color: '#FFFFFF',
         marginTop: 10,
         fontSize: 12,
+        fontWeight: '500',
     },
     oneriScroll: {
         paddingHorizontal: 15,
         paddingVertical: 5,
     },
     oneriKarti: {
-        backgroundColor: '#1E1E1E',
-        borderRadius: 15,
-        padding: 15,
+        borderRadius: 16,
+        padding: 16,
         marginRight: 15,
-        width: width * 0.6, // Ekranın %60'ı kadar genişlik
+        width: width * 0.6,
         maxWidth: 250,
-        minHeight: 80,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 3,
+        minHeight: 90,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     oneriMetni: {
-        color: '#FFFFFF',
         fontSize: 14,
         flex: 1,
         flexWrap: 'wrap',
+        lineHeight: 20,
     },
     oneriIconContainer: {
         marginLeft: 10,
@@ -952,34 +1253,51 @@ const styles = StyleSheet.create({
     sohbetOgesi: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1E1E1E',
-        borderRadius: 15,
-        padding: 15,
+        borderRadius: 16,
         marginHorizontal: 15,
-        marginBottom: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 2,
+        marginBottom: 12,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    sohbetIcerik: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
     },
     sohbetBilgi: {
         flex: 1,
         marginLeft: 15,
     },
     sohbetMetni: {
-        color: '#FFFFFF',
         fontSize: 16,
+        fontWeight: '500',
     },
     sohbetZaman: {
-        color: '#888',
         fontSize: 12,
         marginTop: 5,
+    },
+    sohbetSilButton: {
+        padding: 15,
+        borderLeftWidth: 1,
+        borderLeftColor: 'rgba(255,255,255,0.05)',
     },
     bosSohbetContainer: {
         alignItems: 'center',
         justifyContent: 'center',
         padding: 30,
+        marginTop: 20,
     },
     bosSohbetResim: {
         width: 120,
@@ -988,16 +1306,25 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     bosSohbetMetin: {
-        color: '#888',
         fontSize: 16,
         marginBottom: 20,
         textAlign: 'center',
     },
     bosSohbetButon: {
-        backgroundColor: '#8A2BE2',
-        borderRadius: 10,
+        borderRadius: 24,
         paddingVertical: 12,
         paddingHorizontal: 20,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
     },
     bosSohbetButonMetin: {
         color: '#FFFFFF',
@@ -1006,18 +1333,33 @@ const styles = StyleSheet.create({
     },
     altNavigasyon: {
         flexDirection: 'row',
-        backgroundColor: '#1E1E1E',
-        paddingVertical: 10,
+        paddingVertical: 12,
         paddingHorizontal: 20,
         justifyContent: 'space-around',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.05)',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
     },
     altNavButon: {
         alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
     },
     altNavMetin: {
-        color: '#888',
         marginTop: 5,
         fontSize: 12,
+        fontWeight: '500',
     },
     sohbetEkrani: {
         flex: 1,
@@ -1028,22 +1370,30 @@ const styles = StyleSheet.create({
     },
     mesajKutusu: {
         maxWidth: '80%',
-        padding: 12,
+        padding: 14,
         borderRadius: 18,
         marginBottom: 15,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 2,
+            },
+        }),
     },
     aiMesaji: {
-        backgroundColor: '#1E1E1E',
         alignSelf: 'flex-start',
-        borderTopLeftRadius: 0,
+        borderTopLeftRadius: 2,
     },
     kullaniciMesaji: {
-        backgroundColor: '#8A2BE2',
         alignSelf: 'flex-end',
-        borderTopRightRadius: 0,
+        borderTopRightRadius: 2,
     },
     mesajMetni: {
-        color: '#FFFFFF',
         fontSize: 16,
         lineHeight: 22,
     },
@@ -1059,32 +1409,42 @@ const styles = StyleSheet.create({
     mesajGirisi: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1E1E1E',
         paddingHorizontal: 15,
         paddingVertical: 10,
     },
     ekButon: {
         marginRight: 10,
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     mesajInput: {
         flex: 1,
-        backgroundColor: '#121212',
-        color: '#FFFFFF',
         borderRadius: 20,
         paddingHorizontal: 15,
         paddingVertical: 10,
         maxHeight: 100,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     sesButon: {
         marginLeft: 10,
         padding: 8,
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     mesajGonderButonu: {
         marginLeft: 10,
         padding: 8,
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     yukleniyor: {
-        backgroundColor: '#1E1E1E',
         alignSelf: 'flex-start',
         borderRadius: 18,
         padding: 15,
@@ -1099,29 +1459,26 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#8A2BE2',
         opacity: 0.8,
     },
     fileInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#121212',
         borderRadius: 10,
         padding: 10,
         marginVertical: 15,
         width: '100%',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     fileName: {
-        color: '#FFFFFF',
         marginLeft: 10,
         fontSize: 14,
     },
     modalText: {
-        color: '#FFFFFF',
         textAlign: 'center',
         marginBottom: 20,
     },
-    // Modal stilleri
     modalArkaPlan: {
         flex: 1,
         justifyContent: 'center',
@@ -1130,18 +1487,22 @@ const styles = StyleSheet.create({
     },
     modalIcerik: {
         width: '85%',
-        backgroundColor: '#1E1E1E',
-        borderRadius: 15,
+        borderRadius: 16,
         padding: 20,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 5,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 5 },
+                shadowOpacity: 0.5,
+                shadowRadius: 10,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
     },
     modalBaslik: {
-        color: '#FFFFFF',
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 15,
@@ -1149,13 +1510,13 @@ const styles = StyleSheet.create({
     },
     modalInput: {
         width: '100%',
-        backgroundColor: '#121212',
-        color: '#FFFFFF',
-        borderRadius: 10,
+        borderRadius: 12,
         paddingHorizontal: 15,
         paddingVertical: 12,
         marginBottom: 15,
         fontSize: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     modalButonlar: {
         flexDirection: 'row',
@@ -1163,25 +1524,23 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     modalIptalButon: {
-        backgroundColor: '#333',
-        borderRadius: 10,
-        paddingVertical: 12,
+        borderRadius: 12,
+        paddingVertical: 14,
         paddingHorizontal: 20,
         flex: 1,
         marginRight: 10,
         alignItems: 'center',
     },
     modalOnayButon: {
-        backgroundColor: '#8A2BE2',
-        borderRadius: 10,
-        paddingVertical: 12,
+        borderRadius: 12,
+        paddingVertical: 14,
         paddingHorizontal: 20,
         flex: 1,
         alignItems: 'center',
     },
     modalIptalMetin: {
-        color: '#FFFFFF',
         fontSize: 16,
+        fontWeight: '500',
     },
     modalOnayMetin: {
         color: '#FFFFFF',

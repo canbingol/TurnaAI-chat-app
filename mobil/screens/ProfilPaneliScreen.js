@@ -10,11 +10,14 @@ import {
     ScrollView,
     StatusBar,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Platform,
+    Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import * as ImagePicker from 'expo-image-picker';
+import { CommonActions } from '@react-navigation/native';
 
 export default function ProfilPaneliScreen({ navigation }) {
     const {
@@ -30,9 +33,25 @@ export default function ProfilPaneliScreen({ navigation }) {
     } = useContext(AppContext);
 
     const [avatar, setAvatar] = useState(null);
+    const [fadeAnim] = useState(new Animated.Value(0));
+    const [slideAnim] = useState(new Animated.Value(-50));
 
     useEffect(() => {
         setAvatar(userAvatar);
+
+        // Giriş animasyonu
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true
+            })
+        ]).start();
     }, [userAvatar]);
 
     const profilMenusu = [
@@ -44,7 +63,17 @@ export default function ProfilPaneliScreen({ navigation }) {
         {
             icon: 'settings-outline',
             baslik: 'Ayarlar',
-            onPress: () => navigation.navigate('GenelAyarlar')
+            onPress: () => navigateTo('Ayarlar')
+        },
+        {
+            icon: 'shield-checkmark-outline',
+            baslik: 'Gizlilik ve Güvenlik',
+            onPress: () => showPrivacyOptions()
+        },
+        {
+            icon: 'help-circle-outline',
+            baslik: 'Yardım',
+            onPress: () => navigateTo('Yardım')
         },
         {
             icon: 'log-out-outline',
@@ -52,6 +81,33 @@ export default function ProfilPaneliScreen({ navigation }) {
             onPress: handleLogout
         }
     ];
+
+    // Navigasyon işlevi
+    const navigateTo = (screenName) => {
+        navigation.navigate(screenName);
+    };
+
+    // Gizlilik seçenekleri
+    const showPrivacyOptions = () => {
+        Alert.alert(
+            "Gizlilik ve Güvenlik",
+            "Hesabınızın gizlilik ve güvenlik ayarlarını yönetin",
+            [
+                {
+                    text: "Şifre Değiştir",
+                    onPress: () => Alert.alert("Bilgi", "Şifre değiştirme ekranı yakında eklenecek")
+                },
+                {
+                    text: "Gizlilik Politikası",
+                    onPress: () => Alert.alert("Bilgi", "Gizlilik politikası görüntüleme ekranı geliştirilmektedir")
+                },
+                {
+                    text: "İptal",
+                    style: "cancel"
+                }
+            ]
+        );
+    };
 
     // Çıkış yapma işlemi
     function handleLogout() {
@@ -69,7 +125,12 @@ export default function ProfilPaneliScreen({ navigation }) {
                     onPress: async () => {
                         const success = await logout();
                         if (success) {
-                            navigation.replace('Giris');
+                            navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Giris' }]
+                                })
+                            );
                         }
                     }
                 }
@@ -96,6 +157,7 @@ export default function ProfilPaneliScreen({ navigation }) {
 
             if (!result.canceled) {
                 setAvatar(result.assets[0].uri);
+                Alert.alert('Başarılı', 'Profil fotoğrafınız güncellendi!');
                 // Gerçek uygulamada burada avatar'ı AppContext aracılığıyla güncelleyebilirsiniz
                 // updateUserAvatar(result.assets[0].uri);
             }
@@ -115,7 +177,7 @@ export default function ProfilPaneliScreen({ navigation }) {
                     style={styles.menuButon}
                     onPress={() => navigation.openDrawer()}
                 >
-                    <Ionicons name="menu" size={30} color="#FFFFFF" />
+                    <Ionicons name="menu" size={26} color="#FFFFFF" />
                 </TouchableOpacity>
                 <Text style={styles.baslik}>Profil</Text>
                 <View style={styles.profilButon} />
@@ -126,9 +188,17 @@ export default function ProfilPaneliScreen({ navigation }) {
                     <ActivityIndicator size="large" color="#8A2BE2" />
                 </View>
             ) : (
-                <ScrollView>
+                <ScrollView showsVerticalScrollIndicator={false}>
                     {/* Profil Başlığı */}
-                    <View style={styles.profilBasligi}>
+                    <Animated.View
+                        style={[
+                            styles.profilBasligi,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: slideAnim }]
+                            }
+                        ]}
+                    >
                         <View style={styles.profilResimKonteyneri}>
                             <Image
                                 source={
@@ -155,7 +225,7 @@ export default function ProfilPaneliScreen({ navigation }) {
                             <Ionicons name="create-outline" size={18} color="#FFFFFF" />
                             <Text style={styles.duzenleButtonText}>Profili Düzenle</Text>
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
 
                     {/* Ayarlar */}
                     <View style={styles.ayarlarBolumu}>
@@ -192,14 +262,26 @@ export default function ProfilPaneliScreen({ navigation }) {
                     {profilMenusu.map((menu, index) => (
                         <TouchableOpacity
                             key={index}
-                            style={styles.menuOgesi}
+                            style={[
+                                styles.menuOgesi,
+                                index === profilMenusu.length - 1 && styles.lastMenuItem
+                            ]}
                             onPress={menu.onPress}
                         >
                             <View style={styles.menuIcerigi}>
-                                <Ionicons name={menu.icon} size={24} color="#8A2BE2" />
-                                <Text style={styles.menuMetni}>{menu.baslik}</Text>
+                                <Ionicons name={menu.icon} size={24} color={
+                                    menu.icon === 'log-out-outline' ? '#FF4757' : '#8A2BE2'
+                                } />
+                                <Text style={[
+                                    styles.menuMetni,
+                                    menu.icon === 'log-out-outline' && { color: '#FF4757' }
+                                ]}>{menu.baslik}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={24} color="#666" />
+                            <Ionicons
+                                name="chevron-forward"
+                                size={22}
+                                color={menu.icon === 'log-out-outline' ? '#FF4757' : '#666'}
+                            />
                         </TouchableOpacity>
                     ))}
 
@@ -210,7 +292,7 @@ export default function ProfilPaneliScreen({ navigation }) {
                             style={styles.appLogo}
                             resizeMode="contain"
                         />
-                        <Text style={styles.appName}>AI Asistan</Text>
+                        <Text style={styles.appName}>Turna AI</Text>
                         <Text style={styles.appVersion}>Sürüm 1.0.0</Text>
                     </View>
                 </ScrollView>
@@ -220,14 +302,14 @@ export default function ProfilPaneliScreen({ navigation }) {
             <View style={styles.altNavigasyon}>
                 <TouchableOpacity
                     style={styles.altNavButon}
-                    onPress={() => navigation.navigate('Ana Ekran')}
+                    onPress={() => navigateTo('Ana Ekran')}
                 >
                     <Ionicons name="home-outline" size={24} color="#888" />
                     <Text style={styles.altNavMetin}>Ana Ekran</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.altNavButon}
-                    onPress={() => navigation.navigate('Yardım')}
+                    onPress={() => navigateTo('Yardım')}
                 >
                     <Ionicons name="help-circle-outline" size={24} color="#888" />
                     <Text style={styles.altNavMetin}>Yardım</Text>
@@ -260,9 +342,25 @@ const styles = StyleSheet.create({
         backgroundColor: '#8A2BE2',
         paddingVertical: 15,
         paddingHorizontal: 20,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
     menuButon: {
         width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     profilButon: {
         width: 40,
@@ -275,7 +373,22 @@ const styles = StyleSheet.create({
     profilBasligi: {
         alignItems: 'center',
         paddingVertical: 30,
+        paddingHorizontal: 20,
         backgroundColor: '#1E1E1E',
+        marginBottom: 20,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 6,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
     },
     profilResimKonteyneri: {
         position: 'relative',
@@ -285,7 +398,7 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
         borderRadius: 60,
-        borderWidth: 3,
+        borderWidth: 4,
         borderColor: '#8A2BE2',
     },
     profilDuzenleButonu: {
@@ -295,46 +408,74 @@ const styles = StyleSheet.create({
         backgroundColor: '#8A2BE2',
         borderRadius: 20,
         padding: 8,
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         alignItems: 'center',
         justifyContent: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 5,
+            },
+        }),
     },
     profilAdi: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: 'bold',
         marginBottom: 5,
     },
     profilEposta: {
         color: '#888',
         fontSize: 14,
-        marginBottom: 15,
+        marginBottom: 20,
     },
     duzenleButon: {
-        backgroundColor: '#333',
+        backgroundColor: 'rgba(138, 43, 226, 0.15)',
         borderRadius: 25,
-        paddingVertical: 8,
-        paddingHorizontal: 15,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#8A2BE2',
     },
     duzenleButtonText: {
         color: '#FFFFFF',
-        marginLeft: 5,
+        marginLeft: 8,
         fontSize: 14,
+        fontWeight: '600',
     },
     ayarlarBolumu: {
-        marginTop: 20,
+        marginBottom: 20,
     },
     ayarOgesi: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: '#1E1E1E',
-        paddingVertical: 15,
+        paddingVertical: 16,
         paddingHorizontal: 20,
         marginBottom: 1,
+        borderRadius: 12,
+        marginHorizontal: 15,
+        marginBottom: 10,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
     },
     ayarIcerigi: {
         flexDirection: 'row',
@@ -350,9 +491,27 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: '#1E1E1E',
-        paddingVertical: 15,
+        paddingVertical: 16,
         paddingHorizontal: 20,
-        marginTop: 1,
+        marginHorizontal: 15,
+        marginBottom: 10,
+        borderRadius: 12,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
+    },
+    lastMenuItem: {
+        backgroundColor: 'rgba(255, 71, 87, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 71, 87, 0.3)',
     },
     menuIcerigi: {
         flexDirection: 'row',
@@ -376,7 +535,7 @@ const styles = StyleSheet.create({
     },
     appName: {
         color: '#8A2BE2',
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
     },
     appVersion: {
@@ -386,17 +545,34 @@ const styles = StyleSheet.create({
     },
     altNavigasyon: {
         flexDirection: 'row',
-        backgroundColor: '#1E1E1E',
-        paddingVertical: 10,
+        backgroundColor: '#1A1A1A',
+        paddingVertical: 12,
         paddingHorizontal: 20,
         justifyContent: 'space-around',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.05)',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
     },
     altNavButon: {
         alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
     },
     altNavMetin: {
         color: '#888',
         marginTop: 5,
         fontSize: 12,
+        fontWeight: '500',
     },
 });

@@ -1,6 +1,4 @@
-// CustomDrawerContent.js içinde navigasyon düzeltmesi
-
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,11 +7,12 @@ import {
     Image,
     ImageBackground,
     Alert,
-    Linking
+    Linking,
+    Animated,
+    Platform
 } from 'react-native';
 import {
-    DrawerContentScrollView,
-    DrawerItemList
+    DrawerContentScrollView
 } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
@@ -22,38 +21,63 @@ import { CommonActions } from '@react-navigation/native';
 function CustomDrawerContent(props) {
     const { userName, userEmail, userAvatar, logout } = useContext(AppContext);
 
+    // Animasyon değerleri
+    const [fadeAnim] = useState(new Animated.Value(0));
+    const [slideAnim] = useState(new Animated.Value(-50));
+
+    useEffect(() => {
+        // Giriş animasyonu
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true
+            })
+        ]).start();
+    }, []);
+
     const handleLogout = async () => {
         // Logout işlemini gerçekleştir
-        const success = await logout();
-        if (success) {
-            props.navigation.dispatch(
-                CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: 'Giris' }],
-                })
-            );
-        }
+        Alert.alert(
+            "Çıkış Yap",
+            "Oturumunuzu kapatmak istediğinize emin misiniz?",
+            [
+                {
+                    text: "İptal",
+                    style: "cancel"
+                },
+                {
+                    text: "Çıkış Yap",
+                    style: "destructive",
+                    onPress: async () => {
+                        const success = await logout();
+                        if (success) {
+                            props.navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Giris' }],
+                                })
+                            );
+                        }
+                    }
+                }
+            ]
+        );
     };
 
-    // DÜZELTME: Drawer içindeki ekranlara güvenli navigasyon
+    // Düzeltilmiş navigasyon fonksiyonu
     const navigateToScreen = (screenName) => {
         // Drawer'ı kapat
         props.navigation.closeDrawer();
 
-        // Kısa bir gecikme ile navigasyon yap
+        // Kısa bir gecikme ile yönlendirme yap
         setTimeout(() => {
-            // Ana ekran ve Profil için drawer'ın kendi navigate fonksiyonunu kullan
-            if (screenName === 'Yardım' || screenName === 'GenelAyarlar') {
-                // Stack navigator içindeki ekranlar için CommonActions kullan
-                props.navigation.dispatch(
-                    CommonActions.navigate({
-                        name: screenName
-                    })
-                );
-            } else {
-                // Drawer navigator içindeki ekranlar için jumpTo kullan
-                props.navigation.jumpTo(screenName);
-            }
+            props.navigation.navigate(screenName);
         }, 300);
     };
 
@@ -92,6 +116,13 @@ function CustomDrawerContent(props) {
         );
     };
 
+    // Aktif ekranı kontrol et
+    const isActiveScreen = (screenName) => {
+        if (!props.state || !props.state.routes) return false;
+        const activeRoute = props.state.routes[props.state.index];
+        return activeRoute.name === screenName;
+    };
+
     return (
         <View style={styles.container}>
             {/* Üst Arka Plan */}
@@ -100,7 +131,15 @@ function CustomDrawerContent(props) {
                 style={styles.headerBackground}
             >
                 {/* Profil Başlığı */}
-                <View style={styles.profileContainer}>
+                <Animated.View
+                    style={[
+                        styles.profileContainer,
+                        {
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }]
+                        }
+                    ]}
+                >
                     <Image
                         source={userAvatar ? { uri: userAvatar } : require('../assets/default-profile.png')}
                         style={styles.profileImage}
@@ -109,42 +148,90 @@ function CustomDrawerContent(props) {
                         <Text style={styles.profileName}>{userName}</Text>
                         <Text style={styles.profileEmail}>{userEmail}</Text>
                     </View>
-                </View>
+                </Animated.View>
             </ImageBackground>
 
-            {/* DÜZELTME: DrawerItemList yerine özel butonlar */}
-            <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
+            {/* Özel butonlar */}
+            <DrawerContentScrollView
+                {...props}
+                contentContainerStyle={styles.drawerContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.drawerSection}>
                     {/* Ana Ekran butonu */}
                     <TouchableOpacity
-                        style={[styles.drawerItem, props.state.index === 0 && styles.activeDrawerItem]}
+                        style={[
+                            styles.drawerItem,
+                            isActiveScreen('Ana Ekran') && styles.activeDrawerItem
+                        ]}
                         onPress={() => navigateToScreen('Ana Ekran')}
                     >
                         <Ionicons
                             name="home-outline"
-                            size={22}
-                            color={props.state.index === 0 ? "#FFFFFF" : "#8A2BE2"}
+                            size={24}
+                            color={isActiveScreen('Ana Ekran') ? "#FFFFFF" : "#8A2BE2"}
                         />
                         <Text style={[
                             styles.drawerItemText,
-                            props.state.index === 0 && styles.activeDrawerItemText
+                            isActiveScreen('Ana Ekran') && styles.activeDrawerItemText
                         ]}>Ana Ekran</Text>
                     </TouchableOpacity>
 
                     {/* Profil butonu */}
                     <TouchableOpacity
-                        style={[styles.drawerItem, props.state.index === 1 && styles.activeDrawerItem]}
+                        style={[
+                            styles.drawerItem,
+                            isActiveScreen('Profil') && styles.activeDrawerItem
+                        ]}
                         onPress={() => navigateToScreen('Profil')}
                     >
                         <Ionicons
                             name="person-outline"
-                            size={22}
-                            color={props.state.index === 1 ? "#FFFFFF" : "#8A2BE2"}
+                            size={24}
+                            color={isActiveScreen('Profil') ? "#FFFFFF" : "#8A2BE2"}
                         />
                         <Text style={[
                             styles.drawerItemText,
-                            props.state.index === 1 && styles.activeDrawerItemText
+                            isActiveScreen('Profil') && styles.activeDrawerItemText
                         ]}>Profil</Text>
+                    </TouchableOpacity>
+
+                    {/* Yardım butonu */}
+                    <TouchableOpacity
+                        style={[
+                            styles.drawerItem,
+                            isActiveScreen('Yardım') && styles.activeDrawerItem
+                        ]}
+                        onPress={() => navigateToScreen('Yardım')}
+                    >
+                        <Ionicons
+                            name="help-circle-outline"
+                            size={24}
+                            color={isActiveScreen('Yardım') ? "#FFFFFF" : "#8A2BE2"}
+                        />
+                        <Text style={[
+                            styles.drawerItemText,
+                            isActiveScreen('Yardım') && styles.activeDrawerItemText
+                        ]}>Yardım</Text>
+                    </TouchableOpacity>
+
+                    {/* Ayarlar butonu */}
+                    <TouchableOpacity
+                        style={[
+                            styles.drawerItem,
+                            isActiveScreen('Ayarlar') && styles.activeDrawerItem
+                        ]}
+                        onPress={() => navigateToScreen('Ayarlar')}
+                    >
+                        <Ionicons
+                            name="settings-outline"
+                            size={24}
+                            color={isActiveScreen('Ayarlar') ? "#FFFFFF" : "#8A2BE2"}
+                        />
+                        <Text style={[
+                            styles.drawerItemText,
+                            isActiveScreen('Ayarlar') && styles.activeDrawerItemText
+                        ]}>Ayarlar</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -156,17 +243,9 @@ function CustomDrawerContent(props) {
 
                     <TouchableOpacity
                         style={styles.drawerItem}
-                        onPress={() => navigateToScreen('Yardım')}
-                    >
-                        <Ionicons name="help-circle-outline" size={22} color="#8A2BE2" />
-                        <Text style={styles.drawerItemText}>Yardım</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.drawerItem}
                         onPress={showFAQ}
                     >
-                        <Ionicons name="information-circle-outline" size={22} color="#8A2BE2" />
+                        <Ionicons name="information-circle-outline" size={24} color="#8A2BE2" />
                         <Text style={styles.drawerItemText}>Sık Sorulan Sorular</Text>
                     </TouchableOpacity>
 
@@ -174,8 +253,16 @@ function CustomDrawerContent(props) {
                         style={styles.drawerItem}
                         onPress={showContact}
                     >
-                        <Ionicons name="mail-outline" size={22} color="#8A2BE2" />
+                        <Ionicons name="mail-outline" size={24} color="#8A2BE2" />
                         <Text style={styles.drawerItemText}>İletişim</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.drawerItem}
+                        onPress={() => Alert.alert('Bilgi', 'Uygulama sürümü: 1.0.0\n© 2025 Turna AI Tüm Hakları Saklıdır')}
+                    >
+                        <Ionicons name="information" size={24} color="#8A2BE2" />
+                        <Text style={styles.drawerItemText}>Uygulama Hakkında</Text>
                     </TouchableOpacity>
                 </View>
             </DrawerContentScrollView>
@@ -183,19 +270,11 @@ function CustomDrawerContent(props) {
             {/* Alt Eylemler */}
             <View style={styles.bottomSection}>
                 <TouchableOpacity
-                    style={styles.drawerItem}
-                    onPress={() => navigateToScreen('GenelAyarlar')}
-                >
-                    <Ionicons name="settings-outline" size={22} color="#8A2BE2" />
-                    <Text style={styles.drawerItemText}>Ayarlar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.drawerItem}
+                    style={styles.logoutButton}
                     onPress={handleLogout}
                 >
-                    <Ionicons name="log-out-outline" size={22} color="#8A2BE2" />
-                    <Text style={styles.drawerItemText}>Çıkış Yap</Text>
+                    <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+                    <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -239,48 +318,76 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     drawerContent: {
-        paddingTop: 10,
+        paddingTop: 15,
     },
     drawerSection: {
-        marginBottom: 10,
+        marginBottom: 15,
     },
     sectionTitle: {
         color: '#666',
         fontSize: 14,
         marginLeft: 16,
         marginVertical: 10,
+        letterSpacing: 0.5,
     },
     drawerItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 14,
         paddingHorizontal: 16,
         marginVertical: 2,
-        borderRadius: 8,
-        marginHorizontal: 5,
+        borderRadius: 10,
+        marginHorizontal: 8,
     },
     activeDrawerItem: {
         backgroundColor: '#8A2BE2',
     },
     drawerItemText: {
         color: '#FFFFFF',
-        marginLeft: 32,
+        marginLeft: 16,
         fontSize: 16,
     },
     activeDrawerItemText: {
         fontWeight: 'bold',
-    },
-    bottomSection: {
-        borderTopColor: '#333',
-        borderTopWidth: 1,
-        paddingVertical: 10,
+        color: '#FFFFFF',
     },
     divider: {
         height: 1,
-        backgroundColor: '#333',
-        marginVertical: 10,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginVertical: 12,
         marginHorizontal: 16,
     },
+    bottomSection: {
+        padding: 16,
+        borderTopColor: 'rgba(255,255,255,0.1)',
+        borderTopWidth: 1,
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FF4757',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        justifyContent: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#FF4757',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
+    },
+    logoutButtonText: {
+        color: '#FFFFFF',
+        marginLeft: 10,
+        fontSize: 16,
+        fontWeight: 'bold',
+    }
 });
 
 export default CustomDrawerContent;

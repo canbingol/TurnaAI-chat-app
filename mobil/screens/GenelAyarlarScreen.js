@@ -11,27 +11,57 @@ import {
     Modal,
     Alert,
     Linking,
-    ActivityIndicator
+    ActivityIndicator,
+    Platform,
+    Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppContext } from '../context/AppContext';
+import { AppContext, THEMES, LANGUAGES } from '../context/AppContext';
+import { CommonActions } from '@react-navigation/native';
 
 export default function GenelAyarlarScreen({ navigation }) {
     const {
-        isDarkMode,
-        isNotificationsEnabled,
+        theme,
         language,
-        toggleDarkMode,
+        isNotificationsEnabled,
         toggleNotifications,
+        changeTheme,
         changeLanguage,
-        isLoading
+        isLoading,
+        getColors,
+        t
     } = useContext(AppContext);
 
+    // Tema ve renkleri al
+    const colors = getColors();
+
     const [languageModalVisible, setLanguageModalVisible] = useState(false);
+    const [themeModalVisible, setThemeModalVisible] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState(language);
+    const [selectedTheme, setSelectedTheme] = useState(theme);
     const [fontSizeModalVisible, setFontSizeModalVisible] = useState(false);
     const [fontSize, setFontSize] = useState('normal');
     const [cacheSize, setCacheSize] = useState(null);
+
+    // Animasyon değerleri
+    const [fadeAnim] = useState(new Animated.Value(0));
+    const [slideAnim] = useState(new Animated.Value(30));
+
+    useEffect(() => {
+        // Giriş animasyonu
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true
+            })
+        ]).start();
+    }, []);
 
     // Önbellek boyutunu hesapla (simülasyon)
     useEffect(() => {
@@ -40,20 +70,42 @@ export default function GenelAyarlarScreen({ navigation }) {
         }, 500);
     }, []);
 
+    const themes = [
+        { code: THEMES.DARK, label: t('darkMode'), icon: 'moon-outline' },
+        { code: THEMES.LIGHT, label: t('lightMode'), icon: 'sunny-outline' },
+        { code: THEMES.TURQUOISE, label: t('turquoiseMode'), icon: 'color-palette-outline' }
+    ];
+
     const languages = [
-        { code: 'tr', label: 'Türkçe' },
-        { code: 'en', label: 'İngilizce' },
-        { code: 'de', label: 'Almanca' },
-        { code: 'fr', label: 'Fransızca' },
-        { code: 'es', label: 'İspanyolca' },
+        { code: LANGUAGES.TR, label: t('turkish'), flag: '🇹🇷' },
+        { code: LANGUAGES.EN, label: t('english'), flag: '🇬🇧' },
+        { code: LANGUAGES.FR, label: t('french'), flag: '🇫🇷' }
     ];
 
     const fontSizes = [
-        { code: 'small', label: 'Küçük' },
-        { code: 'normal', label: 'Normal' },
-        { code: 'large', label: 'Büyük' },
-        { code: 'xlarge', label: 'Çok Büyük' },
+        { code: 'small', label: t('small') },
+        { code: 'normal', label: t('normal') },
+        { code: 'large', label: t('large') },
+        { code: 'xlarge', label: t('extraLarge') },
     ];
+
+    // Tema değiştirme işlevi
+    const handleThemeChange = (themeCode) => {
+        setSelectedTheme(themeCode);
+        setThemeModalVisible(false);
+
+        // Context'e kaydet
+        if (changeTheme) {
+            changeTheme(themeCode);
+        }
+
+        // Tema değişikliği bildirimi
+        Alert.alert(
+            t("themeChanged"),
+            t("themeChangeApplied"),
+            [{ text: t("ok"), style: "default" }]
+        );
+    };
 
     // Dil değiştirme işlevi
     const handleLanguageChange = (langCode) => {
@@ -67,9 +119,9 @@ export default function GenelAyarlarScreen({ navigation }) {
 
         // Dil değişikliği bildirimi
         Alert.alert(
-            "Dil Değiştirildi",
-            "Uygulama dili değiştirildi. Değişikliklerin tam olarak uygulanması için uygulamayı yeniden başlatmanız gerekebilir.",
-            [{ text: "Tamam", style: "default" }]
+            t("languageChanged"),
+            t("languageChangeApplied"),
+            [{ text: t("ok"), style: "default" }]
         );
     };
 
@@ -80,30 +132,30 @@ export default function GenelAyarlarScreen({ navigation }) {
 
         // Gerçek uygulamada burada font boyutunu kaydedin
         Alert.alert(
-            "Yazı Boyutu Değiştirildi",
-            "Yazı boyutu ayarınız değiştirildi. Değişikliğin uygulanması için uygulamayı yeniden başlatmanız gerekebilir.",
-            [{ text: "Tamam", style: "default" }]
+            t("fontSizeChanged"),
+            t("fontSizeChangeApplied"),
+            [{ text: t("ok"), style: "default" }]
         );
     };
 
     // Önbelleği temizle
     const clearCache = () => {
         Alert.alert(
-            "Önbelleği Temizle",
-            "Uygulama önbelleğini temizlemek istediğinizden emin misiniz? Bu işlem uygulamayı yavaşlatabilir.",
+            t("clearCache"),
+            t("clearCacheConfirm"),
             [
                 {
-                    text: "İptal",
+                    text: t("cancel"),
                     style: "cancel"
                 },
                 {
-                    text: "Temizle",
+                    text: t("clear"),
                     style: "destructive",
                     onPress: () => {
                         // Simülasyon - gerçek uygulamada önbellek temizleme kodunu buraya ekleyin
                         setTimeout(() => {
                             setCacheSize('0 MB');
-                            Alert.alert("Bilgi", "Önbellek başarıyla temizlendi");
+                            Alert.alert(t("info"), t("cacheCleared"));
                         }, 1000);
                     }
                 }
@@ -114,29 +166,29 @@ export default function GenelAyarlarScreen({ navigation }) {
     // Bildirim ayarlarını göster
     const showNotificationSettings = () => {
         Alert.alert(
-            "Bildirim Ayarları",
-            "Hangi tür bildirimleri almak istiyorsunuz?",
+            t("notificationSettings"),
+            t("notificationSettingsDesc"),
             [
                 {
-                    text: "AI Asistan Yanıtları",
+                    text: t("aiAssistantNotifications"),
                     onPress: () => {
-                        Alert.alert("Bilgi", "AI Asistan bildirim ayarları güncellendi");
+                        Alert.alert(t("info"), t("aiAssistantNotificationsUpdated"));
                     }
                 },
                 {
-                    text: "Sistem Bildirimleri",
+                    text: t("systemNotifications"),
                     onPress: () => {
-                        Alert.alert("Bilgi", "Sistem bildirim ayarları güncellendi");
+                        Alert.alert(t("info"), t("systemNotificationsUpdated"));
                     }
                 },
                 {
-                    text: "Tüm Bildirimler",
+                    text: t("allNotifications"),
                     onPress: () => {
-                        Alert.alert("Bilgi", "Tüm bildirim ayarları güncellendi");
+                        Alert.alert(t("info"), t("allNotificationsUpdated"));
                     }
                 },
                 {
-                    text: "İptal",
+                    text: t("cancel"),
                     style: "cancel"
                 }
             ]
@@ -156,94 +208,126 @@ export default function GenelAyarlarScreen({ navigation }) {
     // Hakkında bilgisini göster
     const showAboutInfo = () => {
         Alert.alert(
-            "Turna AI Hakkında",
-            "Versiyon: 1.0.0\n\nTurna AI, yapay zeka destekli kişisel asistan uygulamasıdır. " +
-            "Her türlü sorunuza yanıt verebilir, metin oluşturabilir ve başka birçok görevde size yardımcı olabilir.\n\n" +
-            "© 2025 Turna AI Tüm Hakları Saklıdır.",
-            [{ text: "Tamam", style: "default" }]
+            t("aboutTurnaAI"),
+            t("versionInfo") + "\n\n" +
+            t("aboutDescription") + "\n\n" +
+            t("copyright"),
+            [{ text: t("ok"), style: "default" }]
         );
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar backgroundColor="#8A2BE2" barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar backgroundColor={colors.statusBar} barStyle="light-content" />
 
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+            <View style={[styles.header, { backgroundColor: colors.primary }]}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Ayarlar</Text>
+                <Text style={styles.headerTitle}>{t('settings')}</Text>
                 <View style={styles.placeholder} />
             </View>
 
             {isLoading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#8A2BE2" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
-                <ScrollView style={styles.scrollView}>
+                <ScrollView
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
+                >
                     {/* Genel Ayarlar Bölümü */}
-                    <View style={styles.settingsSection}>
-                        <Text style={styles.sectionTitle}>Genel</Text>
-
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingItemContent}>
-                                <Ionicons name="moon-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Karanlık Mod</Text>
-                            </View>
-                            <Switch
-                                trackColor={{ false: "#767577", true: "#8A2BE2" }}
-                                thumbColor={isDarkMode ? "#FFFFFF" : "#f4f3f4"}
-                                ios_backgroundColor="#3e3e3e"
-                                onValueChange={toggleDarkMode}
-                                value={isDarkMode}
-                            />
-                        </View>
+                    <Animated.View
+                        style={[
+                            styles.settingsSection,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: slideAnim }]
+                            }
+                        ]}
+                    >
+                        <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('general')}</Text>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
+                            onPress={() => setThemeModalVisible(true)}
+                        >
+                            <View style={styles.settingItemContent}>
+                                <Ionicons
+                                    name={
+                                        theme === THEMES.DARK ? "moon-outline" :
+                                            theme === THEMES.LIGHT ? "sunny-outline" :
+                                                "color-palette-outline"
+                                    }
+                                    size={24}
+                                    color={colors.primary}
+                                />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('theme')}</Text>
+                            </View>
+                            <View style={styles.settingValue}>
+                                <Text style={[styles.settingValueText, { color: colors.textSecondary }]}>
+                                    {themes.find(t => t.code === theme)?.label || t('darkMode')}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={() => setLanguageModalVisible(true)}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="globe-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Dil</Text>
+                                <Ionicons name="globe-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('language')}</Text>
                             </View>
                             <View style={styles.settingValue}>
-                                <Text style={styles.settingValueText}>
-                                    {languages.find(lang => lang.code === selectedLanguage)?.label || 'Türkçe'}
+                                <Text style={[styles.settingValueText, { color: colors.textSecondary }]}>
+                                    {languages.find(lang => lang.code === language)?.flag} {languages.find(lang => lang.code === language)?.label || t('turkish')}
                                 </Text>
-                                <Ionicons name="chevron-forward" size={20} color="#666" />
+                                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                             </View>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={() => setFontSizeModalVisible(true)}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="text-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Yazı Boyutu</Text>
+                                <Ionicons name="text-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('fontSize')}</Text>
                             </View>
                             <View style={styles.settingValue}>
-                                <Text style={styles.settingValueText}>
-                                    {fontSizes.find(size => size.code === fontSize)?.label || 'Normal'}
+                                <Text style={[styles.settingValueText, { color: colors.textSecondary }]}>
+                                    {fontSizes.find(size => size.code === fontSize)?.label || t('normal')}
                                 </Text>
-                                <Ionicons name="chevron-forward" size={20} color="#666" />
+                                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                             </View>
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
 
                     {/* Bildirimler Bölümü */}
-                    <View style={styles.settingsSection}>
-                        <Text style={styles.sectionTitle}>Bildirimler</Text>
+                    <Animated.View
+                        style={[
+                            styles.settingsSection,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: Animated.multiply(slideAnim, 1.2) }]
+                            }
+                        ]}
+                    >
+                        <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('notifications')}</Text>
 
-                        <View style={styles.settingItem}>
+                        <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="notifications-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Bildirimleri Etkinleştir</Text>
+                                <Ionicons name="notifications-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('enableNotifications')}</Text>
                             </View>
                             <Switch
-                                trackColor={{ false: "#767577", true: "#8A2BE2" }}
+                                trackColor={{ false: "#767577", true: colors.primary }}
                                 thumbColor={isNotificationsEnabled ? "#FFFFFF" : "#f4f3f4"}
                                 ios_backgroundColor="#3e3e3e"
                                 onValueChange={toggleNotifications}
@@ -253,93 +337,109 @@ export default function GenelAyarlarScreen({ navigation }) {
 
                         {isNotificationsEnabled && (
                             <TouchableOpacity
-                                style={styles.settingItem}
+                                style={[styles.settingItem, { backgroundColor: colors.card }]}
                                 onPress={showNotificationSettings}
                             >
                                 <View style={styles.settingItemContent}>
-                                    <Ionicons name="options-outline" size={24} color="#8A2BE2" />
-                                    <Text style={styles.settingItemText}>Bildirim Ayarları</Text>
+                                    <Ionicons name="options-outline" size={24} color={colors.primary} />
+                                    <Text style={[styles.settingItemText, { color: colors.text }]}>{t('notificationSettings')}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#666" />
+                                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                             </TouchableOpacity>
                         )}
-                    </View>
+                    </Animated.View>
 
                     {/* Depolama ve Veri Bölümü */}
-                    <View style={styles.settingsSection}>
-                        <Text style={styles.sectionTitle}>Depolama ve Veri</Text>
+                    <Animated.View
+                        style={[
+                            styles.settingsSection,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: Animated.multiply(slideAnim, 1.4) }]
+                            }
+                        ]}
+                    >
+                        <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('storageAndData')}</Text>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={clearCache}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="trash-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Önbelleği Temizle</Text>
+                                <Ionicons name="trash-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('clearCache')}</Text>
                             </View>
-                            <Text style={styles.settingValueText}>{cacheSize || '...'}</Text>
+                            <Text style={[styles.settingValueText, { color: colors.textSecondary }]}>{cacheSize || '...'}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
-                            onPress={() => Alert.alert("Bilgi", "Sohbet geçmişi temizlendi")}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
+                            onPress={() => Alert.alert(t("info"), t("chatHistoryCleared"))}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="chatbubble-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Sohbet Geçmişini Temizle</Text>
+                                <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('clearChatHistory')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
 
                     {/* Yasal Bilgiler ve Destek */}
-                    <View style={styles.settingsSection}>
-                        <Text style={styles.sectionTitle}>Yasal ve Destek</Text>
+                    <Animated.View
+                        style={[
+                            styles.settingsSection,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: Animated.multiply(slideAnim, 1.6) }]
+                            }
+                        ]}
+                    >
+                        <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('legalAndSupport')}</Text>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={showPrivacyPolicy}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="shield-checkmark-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Gizlilik Politikası</Text>
+                                <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('privacyPolicy')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={showTermsOfService}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="document-text-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Kullanım Koşulları</Text>
+                                <Ionicons name="document-text-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('termsOfService')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={() => Linking.openURL('mailto:destek@turnaai.com')}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="mail-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Destek</Text>
+                                <Ionicons name="mail-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('support')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.settingItem}
+                            style={[styles.settingItem, { backgroundColor: colors.card }]}
                             onPress={showAboutInfo}
                         >
                             <View style={styles.settingItemContent}>
-                                <Ionicons name="information-circle-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.settingItemText}>Hakkında</Text>
+                                <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.settingItemText, { color: colors.text }]}>{t('about')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
                 </ScrollView>
             )}
 
@@ -351,8 +451,8 @@ export default function GenelAyarlarScreen({ navigation }) {
                 onRequestClose={() => setLanguageModalVisible(false)}
             >
                 <View style={styles.modalBackground}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Dil Seçimi</Text>
+                    <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>{t('chooseLanguage')}</Text>
 
                         <ScrollView style={styles.modalScrollView}>
                             {languages.map((lang) => (
@@ -360,16 +460,19 @@ export default function GenelAyarlarScreen({ navigation }) {
                                     key={lang.code}
                                     style={[
                                         styles.modalItem,
-                                        selectedLanguage === lang.code && styles.modalItemSelected
+                                        selectedLanguage === lang.code && [styles.modalItemSelected, { backgroundColor: colors.primary }]
                                     ]}
                                     onPress={() => handleLanguageChange(lang.code)}
                                 >
-                                    <Text style={[
-                                        styles.modalItemText,
-                                        selectedLanguage === lang.code && styles.modalItemTextSelected
-                                    ]}>
-                                        {lang.label}
-                                    </Text>
+                                    <View style={styles.modalItemTextContainer}>
+                                        <Text style={styles.flagText}>{lang.flag}</Text>
+                                        <Text style={[
+                                            styles.modalItemText,
+                                            selectedLanguage === lang.code ? styles.modalItemTextSelected : { color: colors.text }
+                                        ]}>
+                                            {lang.label}
+                                        </Text>
+                                    </View>
                                     {selectedLanguage === lang.code && (
                                         <Ionicons name="checkmark" size={20} color="#FFFFFF" />
                                     )}
@@ -378,10 +481,62 @@ export default function GenelAyarlarScreen({ navigation }) {
                         </ScrollView>
 
                         <TouchableOpacity
-                            style={styles.modalCloseButton}
+                            style={[styles.modalCloseButton, { backgroundColor: colors.card, borderColor: colors.border }]}
                             onPress={() => setLanguageModalVisible(false)}
                         >
-                            <Text style={styles.modalCloseButtonText}>İptal</Text>
+                            <Text style={[styles.modalCloseButtonText, { color: colors.text }]}>{t('cancel')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Tema Seçimi Modal */}
+            <Modal
+                visible={themeModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setThemeModalVisible(false)}
+            >
+                <View style={styles.modalBackground}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>{t('chooseTheme')}</Text>
+
+                        <ScrollView style={styles.modalScrollView}>
+                            {themes.map((themeOption) => (
+                                <TouchableOpacity
+                                    key={themeOption.code}
+                                    style={[
+                                        styles.modalItem,
+                                        selectedTheme === themeOption.code && [styles.modalItemSelected, { backgroundColor: colors.primary }]
+                                    ]}
+                                    onPress={() => handleThemeChange(themeOption.code)}
+                                >
+                                    <View style={styles.modalItemTextContainer}>
+                                        <Ionicons name={themeOption.icon} size={24} color={
+                                            selectedTheme === themeOption.code ? "#FFFFFF" :
+                                                themeOption.code === THEMES.DARK ? "#9775fa" :
+                                                    themeOption.code === THEMES.LIGHT ? "#fcc419" :
+                                                        "#00CED1"
+                                        } style={styles.themeIcon} />
+                                        <Text style={[
+                                            styles.modalItemText,
+                                            selectedTheme === themeOption.code ? styles.modalItemTextSelected : { color: colors.text }
+                                        ]}>
+                                            {themeOption.label}
+                                        </Text>
+                                    </View>
+                                    {selectedTheme === themeOption.code && (
+                                        <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={[styles.modalCloseButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                            onPress={() => setThemeModalVisible(false)}
+                        >
+                            <Text style={[styles.modalCloseButtonText, { color: colors.text }]}>{t('cancel')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -395,8 +550,8 @@ export default function GenelAyarlarScreen({ navigation }) {
                 onRequestClose={() => setFontSizeModalVisible(false)}
             >
                 <View style={styles.modalBackground}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Yazı Boyutu</Text>
+                    <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>{t('fontSize')}</Text>
 
                         <ScrollView style={styles.modalScrollView}>
                             {fontSizes.map((size) => (
@@ -404,13 +559,16 @@ export default function GenelAyarlarScreen({ navigation }) {
                                     key={size.code}
                                     style={[
                                         styles.modalItem,
-                                        fontSize === size.code && styles.modalItemSelected
+                                        fontSize === size.code && [styles.modalItemSelected, { backgroundColor: colors.primary }]
                                     ]}
                                     onPress={() => handleFontSizeChange(size.code)}
                                 >
                                     <Text style={[
                                         styles.modalItemText,
-                                        fontSize === size.code && styles.modalItemTextSelected
+                                        fontSize === size.code ? styles.modalItemTextSelected : { color: colors.text },
+                                        size.code === 'small' && { fontSize: 14 },
+                                        size.code === 'large' && { fontSize: 18 },
+                                        size.code === 'xlarge' && { fontSize: 20 }
                                     ]}>
                                         {size.label}
                                     </Text>
@@ -422,10 +580,10 @@ export default function GenelAyarlarScreen({ navigation }) {
                         </ScrollView>
 
                         <TouchableOpacity
-                            style={styles.modalCloseButton}
+                            style={[styles.modalCloseButton, { backgroundColor: colors.card, borderColor: colors.border }]}
                             onPress={() => setFontSizeModalVisible(false)}
                         >
-                            <Text style={styles.modalCloseButtonText}>İptal</Text>
+                            <Text style={[styles.modalCloseButtonText, { color: colors.text }]}>{t('cancel')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -437,23 +595,40 @@ export default function GenelAyarlarScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#8A2BE2',
         paddingVertical: 15,
         paddingHorizontal: 20,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
     headerTitle: {
         color: '#fff',
         fontSize: 20,
         fontWeight: 'bold',
     },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
     placeholder: {
-        width: 24, // Matches the back button width to center the title
+        width: 40,
     },
     loadingContainer: {
         flex: 1,
@@ -467,28 +642,41 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     sectionTitle: {
-        color: '#8A2BE2',
         fontSize: 16,
         fontWeight: 'bold',
         marginHorizontal: 20,
         marginTop: 20,
         marginBottom: 10,
+        letterSpacing: 0.5,
     },
     settingItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#1E1E1E',
-        paddingVertical: 15,
+        paddingVertical: 16,
         paddingHorizontal: 20,
-        marginBottom: 1,
+        marginBottom: 10,
+        marginHorizontal: 15,
+        borderRadius: 12,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     settingItemContent: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     settingItemText: {
-        color: '#fff',
         fontSize: 16,
         marginLeft: 15,
     },
@@ -497,7 +685,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     settingValueText: {
-        color: '#888',
         fontSize: 14,
         marginRight: 5,
     },
@@ -511,13 +698,22 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         width: '80%',
-        backgroundColor: '#1E1E1E',
-        borderRadius: 15,
+        borderRadius: 16,
         padding: 20,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 5,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
     },
     modalTitle: {
-        color: '#fff',
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 20,
         textAlign: 'center',
@@ -531,27 +727,39 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingVertical: 15,
-        paddingHorizontal: 10,
+        paddingHorizontal: 15,
         borderRadius: 10,
+        marginBottom: 8,
     },
     modalItemSelected: {
         backgroundColor: '#8A2BE2',
     },
+    modalItemTextContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     modalItemText: {
-        color: '#fff',
         fontSize: 16,
     },
     modalItemTextSelected: {
         fontWeight: 'bold',
+        color: '#FFFFFF',
+    },
+    flagText: {
+        fontSize: 20,
+        marginRight: 10,
+    },
+    themeIcon: {
+        marginRight: 10,
     },
     modalCloseButton: {
-        backgroundColor: '#333',
-        borderRadius: 10,
-        paddingVertical: 12,
+        borderRadius: 12,
+        paddingVertical: 14,
         alignItems: 'center',
+        borderWidth: 1,
     },
     modalCloseButtonText: {
-        color: '#fff',
         fontSize: 16,
+        fontWeight: '500',
     },
 });

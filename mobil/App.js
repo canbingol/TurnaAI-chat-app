@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,43 +16,29 @@ import GenelAyarlarScreen from './screens/GenelAyarlarScreen';
 import CustomDrawerContent from './components/CustomDrawerContent';
 
 // Context yapısı
-import { AppContextProvider } from './context/AppContext';
+import { AppContext, AppContextProvider } from './context/AppContext';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
-function MainDrawerNavigator() {
-  return (
-    <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        headerShown: false,
-        drawerActiveBackgroundColor: '#8A2BE2',
-        drawerActiveTintColor: '#FFFFFF',
-        drawerInactiveTintColor: '#888',
-        drawerStyle: {
-          backgroundColor: '#121212'
-        }
-      }}
-    >
-      <Drawer.Screen name="Ana Ekran" component={AnaEkranScreen} />
-      <Drawer.Screen name="Profil" component={ProfilPaneliScreen} />
-    </Drawer.Navigator>
-  );
-}
-
-function SplashScreen() {
-  return (
-    <View style={styles.splashContainer}>
-      <Text style={styles.splashText}>Turna AI</Text>
-      <ActivityIndicator size="large" color="#8A2BE2" />
-    </View>
-  );
-}
-
-export default function App() {
+// Tema destekli ana uygulama bileşeni
+function MainApp() {
+  const { getColors, t } = useContext(AppContext);
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
+
+  // Navigasyon teması
+  const navigationTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: getColors().primary,
+      background: getColors().background,
+      card: getColors().card,
+      text: getColors().text,
+      border: getColors().border,
+    },
+  };
 
   useEffect(() => {
     // Giriş durumunu kontrol et
@@ -70,20 +56,82 @@ export default function App() {
     };
 
     checkLoginStatus();
+
+    // İlk kullanımda örnek kullanıcılar oluştur
+    const initializeUsers = async () => {
+      try {
+        const existingUsers = await AsyncStorage.getItem('users');
+        if (!existingUsers) {
+          // Örnek kullanıcılar
+          const sampleUsers = [
+            {
+              id: '1',
+              name: 'Test Kullanıcı',
+              email: 'test@example.com',
+              password: '123456',
+              avatar: null,
+              createdAt: new Date().toISOString()
+            }
+          ];
+          await AsyncStorage.setItem('users', JSON.stringify(sampleUsers));
+        }
+      } catch (error) {
+        console.error('Kullanıcılar oluşturulurken hata:', error);
+      }
+    };
+
+    initializeUsers();
   }, []);
+
+  function MainDrawerNavigator() {
+    return (
+      <Drawer.Navigator
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{
+          headerShown: false,
+          drawerActiveBackgroundColor: getColors().primary,
+          drawerActiveTintColor: '#FFFFFF',
+          drawerInactiveTintColor: getColors().textSecondary,
+          drawerLabelStyle: { marginLeft: -20 },
+          drawerStyle: {
+            backgroundColor: getColors().background,
+            width: 280,
+          }
+        }}
+      >
+        <Drawer.Screen name="Ana Ekran" component={AnaEkranScreen} options={{ title: t('home') }} />
+        <Drawer.Screen name="Profil" component={ProfilPaneliScreen} options={{ title: t('profile') }} />
+        <Drawer.Screen name="Yardım" component={YardimPaneliScreen} options={{ title: t('help') }} />
+        <Drawer.Screen name="Ayarlar" component={GenelAyarlarScreen} options={{ title: t('settings') }} />
+      </Drawer.Navigator>
+    );
+  }
+
+  function SplashScreen() {
+    return (
+      <View style={[styles.splashContainer, { backgroundColor: getColors().background }]}>
+        <Text style={[styles.splashText, { color: getColors().primary }]}>Turna AI</Text>
+        <ActivityIndicator size="large" color={getColors().primary} />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return <SplashScreen />;
   }
 
   return (
-    <AppContextProvider>
-      <NavigationContainer>
+    <View style={{ flex: 1 }}>
+      <StatusBar
+        backgroundColor={getColors().statusBar}
+        barStyle="light-content"
+      />
+      <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator
           initialRouteName={userToken ? "Main" : "Giris"}
           screenOptions={{
             headerShown: false,
-            cardStyle: { backgroundColor: '#121212' }
+            cardStyle: { backgroundColor: getColors().background }
           }}
         >
           <Stack.Screen name="Giris" component={GirisScreen} />
@@ -94,10 +142,17 @@ export default function App() {
             options={{ gestureEnabled: false }}
           />
           <Stack.Screen name="KullaniciPaneli" component={KullaniciPaneliScreen} />
-          <Stack.Screen name="GenelAyarlar" component={GenelAyarlarScreen} />
-          <Stack.Screen name="Yardım" component={YardimPaneliScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+    </View>
+  );
+}
+
+// Ana uygulama bileşeni
+export default function App() {
+  return (
+    <AppContextProvider>
+      <MainApp />
     </AppContextProvider>
   );
 }
@@ -107,12 +162,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
   },
   splashText: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    color: '#8A2BE2',
     marginBottom: 20,
+    letterSpacing: 1,
   }
 });

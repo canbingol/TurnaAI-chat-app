@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -11,19 +11,79 @@ import {
     ActivityIndicator,
     Keyboard,
     TouchableWithoutFeedback,
-    Alert,
-    Animated
+    Animated,
+    Easing,
+    Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const { width, height } = Dimensions.get('window');
+
 export default function GirisScreen({ navigation }) {
-    const { login, isLoading } = useContext(AppContext);
+    const { login, isLoading, getColors, t } = useContext(AppContext);
+    const colors = getColors();
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-    const [buttonScale] = useState(new Animated.Value(1));
+
+    // Animasyon değerleri
+    const logoAnim = useRef(new Animated.Value(0)).current;
+    const formAnim = useRef(new Animated.Value(0)).current;
+    const buttonAnim = useRef(new Animated.Value(1)).current;
+    const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+
+    // Logo için döndürme animasyonu
+    const logoRotation = logoAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg']
+    });
+
+    // Giriş animasyonları
+    useEffect(() => {
+        // Logo animasyonu - Döndürme ve yükseltme
+        Animated.sequence([
+            Animated.timing(logoAnim, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+                easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+            }),
+            // Form alanlarını gösterme
+            Animated.timing(formAnim, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.quad)
+            })
+        ]).start();
+
+        // Sürekli olarak logo pulse animasyonu
+        const pulsateAnimation = Animated.loop(
+            Animated.sequence([
+                Animated.timing(buttonAnim, {
+                    toValue: 1.05,
+                    duration: 1500,
+                    useNativeDriver: true,
+                    easing: Easing.inOut(Easing.quad)
+                }),
+                Animated.timing(buttonAnim, {
+                    toValue: 1,
+                    duration: 1500,
+                    useNativeDriver: true,
+                    easing: Easing.inOut(Easing.quad)
+                })
+            ])
+        );
+
+        pulsateAnimation.start();
+
+        return () => {
+            pulsateAnimation.stop();
+        };
+    }, []);
 
     // Input validasyonu
     const [emailError, setEmailError] = useState('');
@@ -51,10 +111,10 @@ export default function GirisScreen({ navigation }) {
 
         // Email kontrolü
         if (!email.trim()) {
-            setEmailError('E-posta adresi boş olamaz');
+            setEmailError(t('emailRequired'));
             isValid = false;
         } else if (!/^\S+@\S+\.\S+$/.test(email)) {
-            setEmailError('Geçerli bir e-posta adresi girin');
+            setEmailError(t('invalidEmail'));
             isValid = false;
         } else {
             setEmailError('');
@@ -62,10 +122,10 @@ export default function GirisScreen({ navigation }) {
 
         // Şifre kontrolü
         if (!password) {
-            setPasswordError('Şifre boş olamaz');
+            setPasswordError(t('passwordRequired'));
             isValid = false;
         } else if (password.length < 6) {
-            setPasswordError('Şifre en az 6 karakter olmalıdır');
+            setPasswordError(t('passwordTooShort'));
             isValid = false;
         } else {
             setPasswordError('');
@@ -75,31 +135,28 @@ export default function GirisScreen({ navigation }) {
 
         Keyboard.dismiss();
 
-        // AppContext'teki login fonksiyonunu çağır
-        const success = await login(email, password);
-
-        if (success) {
-            // Email'i kaydet
-            try {
-                await AsyncStorage.setItem('savedEmail', email);
-            } catch (error) {
-                console.log('Email kaydedilirken hata:', error);
-            }
+        // Basit giriş, kullanıcı doğrulamasını kaldırıyoruz
+        try {
+            // Kullanıcı doğrulaması olmadan email'i kaydet
+            await AsyncStorage.setItem('savedEmail', email);
+            await AsyncStorage.setItem('userToken', 'demo-token');
 
             // Ana ekrana yönlendir
             navigation.replace('Main');
+        } catch (error) {
+            console.log('Giriş işlemi sırasında hata:', error);
         }
     };
 
     const handleMisafirGirisi = () => {
         // Misafir girişi animasyonu
         Animated.sequence([
-            Animated.timing(buttonScale, {
+            Animated.timing(buttonScaleAnim, {
                 toValue: 0.9,
                 duration: 100,
                 useNativeDriver: true
             }),
-            Animated.timing(buttonScale, {
+            Animated.timing(buttonScaleAnim, {
                 toValue: 1,
                 duration: 100,
                 useNativeDriver: true
@@ -112,7 +169,7 @@ export default function GirisScreen({ navigation }) {
 
     // Buton basma animasyonu
     const onPressIn = () => {
-        Animated.timing(buttonScale, {
+        Animated.timing(buttonScaleAnim, {
             toValue: 0.95,
             duration: 100,
             useNativeDriver: true
@@ -120,7 +177,7 @@ export default function GirisScreen({ navigation }) {
     };
 
     const onPressOut = () => {
-        Animated.timing(buttonScale, {
+        Animated.timing(buttonScaleAnim, {
             toValue: 1,
             duration: 100,
             useNativeDriver: true
@@ -129,26 +186,79 @@ export default function GirisScreen({ navigation }) {
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <SafeAreaView style={styles.container}>
-                <StatusBar backgroundColor="#8A2BE2" barStyle="light-content" />
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+                <StatusBar backgroundColor={colors.statusBar} barStyle="light-content" />
 
                 <View style={styles.logoContainer}>
-                    <Image
+                    <Animated.Image
                         source={require('../assets/turna-logo.svg')}
-                        style={styles.logo}
+                        style={[
+                            styles.logo,
+                            {
+                                transform: [
+                                    { rotate: logoRotation },
+                                    { scale: buttonAnim }
+                                ]
+                            }
+                        ]}
                         resizeMode="contain"
                     />
-                    <Text style={styles.title}>Turna AI</Text>
-                    <Text style={styles.subtitle}>Yapay zeka asistanınız yanınızda</Text>
+                    <Animated.Text
+                        style={[
+                            styles.title,
+                            {
+                                color: colors.primary,
+                                opacity: logoAnim,
+                                transform: [{
+                                    translateY: logoAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [20, 0]
+                                    })
+                                }]
+                            }
+                        ]}
+                    >
+                        Turna AI
+                    </Animated.Text>
+                    <Animated.Text
+                        style={[
+                            styles.subtitle,
+                            {
+                                color: colors.textSecondary,
+                                opacity: logoAnim,
+                                transform: [{
+                                    translateY: logoAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [20, 0]
+                                    })
+                                }]
+                            }
+                        ]}
+                    >
+                        {t('aiAssistantByYourSide')}
+                    </Animated.Text>
                 </View>
 
-                <View style={styles.formContainer}>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="mail-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                <Animated.View
+                    style={[
+                        styles.formContainer,
+                        {
+                            opacity: formAnim,
+                            transform: [{
+                                translateY: formAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [50, 0]
+                                })
+                            }]
+                        }
+                    ]}
+                >
+                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="mail-outline" size={24} color={colors.primary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
-                            placeholder="E-posta"
-                            placeholderTextColor="#888"
+                            style={[styles.input, { color: colors.text }]}
+                            placeholder={t('email')}
+                            placeholderTextColor={colors.textSecondary}
                             value={email}
                             onChangeText={(text) => {
                                 setEmail(text);
@@ -160,12 +270,12 @@ export default function GirisScreen({ navigation }) {
                     </View>
                     {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="lock-closed-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="lock-closed-outline" size={24} color={colors.primary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
-                            placeholder="Şifre"
-                            placeholderTextColor="#888"
+                            style={[styles.input, { color: colors.text }]}
+                            placeholder={t('password')}
+                            placeholderTextColor={colors.textSecondary}
                             value={password}
                             onChangeText={(text) => {
                                 setPassword(text);
@@ -180,19 +290,19 @@ export default function GirisScreen({ navigation }) {
                             <Ionicons
                                 name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#888"
+                                color={colors.textSecondary}
                             />
                         </TouchableOpacity>
                     </View>
                     {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
                     <TouchableOpacity style={styles.forgotPassword}>
-                        <Text style={styles.forgotPasswordText}>Şifremi Unuttum</Text>
+                        <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>{t('forgotPassword')}</Text>
                     </TouchableOpacity>
 
-                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                    <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
                         <TouchableOpacity
-                            style={styles.loginButton}
+                            style={[styles.loginButton, { backgroundColor: colors.primary }]}
                             onPress={handleLogin}
                             disabled={isLoading}
                             onPressIn={onPressIn}
@@ -201,28 +311,28 @@ export default function GirisScreen({ navigation }) {
                             {isLoading ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
-                                <Text style={styles.loginButtonText}>Giriş Yap</Text>
+                                <Text style={styles.loginButtonText}>{t('login')}</Text>
                             )}
                         </TouchableOpacity>
                     </Animated.View>
 
                     <TouchableOpacity
-                        style={styles.misafirButton}
+                        style={[styles.misafirButton, { backgroundColor: colors.card, borderColor: colors.border }]}
                         onPress={handleMisafirGirisi}
                     >
-                        <Text style={styles.misafirButtonText}>Misafir Olarak Devam Et</Text>
+                        <Text style={[styles.misafirButtonText, { color: colors.primary }]}>{t('continueAsGuest')}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.registerContainer}>
-                        <Text style={styles.registerText}>Hesabın yok mu?</Text>
+                        <Text style={[styles.registerText, { color: colors.textSecondary }]}>{t('noAccount')}</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Kayit')}>
-                            <Text style={styles.registerLink}>Kayıt Ol</Text>
+                            <Text style={[styles.registerLink, { color: colors.primary }]}>{t('register')}</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>Sürüm 1.0.0</Text>
+                    <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('version')} 1.0.0</Text>
                 </View>
             </SafeAreaView>
         </TouchableWithoutFeedback>
@@ -232,7 +342,6 @@ export default function GirisScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
     },
     logoContainer: {
         alignItems: 'center',
@@ -245,12 +354,10 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     title: {
-        color: '#8A2BE2',
         fontSize: 28,
         fontWeight: 'bold',
     },
     subtitle: {
-        color: '#888',
         fontSize: 16,
         marginTop: 5,
     },
@@ -260,8 +367,7 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1E1E1E',
-        borderRadius: 10,
+        borderRadius: 12,
         marginBottom: 5,
         paddingHorizontal: 15,
         elevation: 2,
@@ -269,13 +375,13 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.2,
         shadowRadius: 1.5,
+        borderWidth: 1,
     },
     inputIcon: {
         marginRight: 10,
     },
     input: {
         flex: 1,
-        color: '#FFFFFF',
         paddingVertical: 14,
         fontSize: 16,
     },
@@ -293,12 +399,10 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     forgotPasswordText: {
-        color: '#8A2BE2',
         fontSize: 14,
     },
     loginButton: {
-        backgroundColor: '#8A2BE2',
-        borderRadius: 10,
+        borderRadius: 12,
         paddingVertical: 15,
         alignItems: 'center',
         marginBottom: 15,
@@ -314,16 +418,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     misafirButton: {
-        backgroundColor: '#1E1E1E',
-        borderRadius: 10,
+        borderRadius: 12,
         paddingVertical: 15,
         alignItems: 'center',
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#333',
     },
     misafirButtonText: {
-        color: '#8A2BE2',
         fontSize: 16,
     },
     registerContainer: {
@@ -332,12 +433,10 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     registerText: {
-        color: '#888',
         marginRight: 5,
         fontSize: 16,
     },
     registerLink: {
-        color: '#8A2BE2',
         fontWeight: 'bold',
         fontSize: 16,
     },
@@ -348,7 +447,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     footerText: {
-        color: '#666',
         fontSize: 12,
     },
 });
