@@ -1569,5 +1569,5 @@ window.showToast = function (message, type = 'info') {
     }, 3000);
 };
 
-// sendMessage fonksiyonunu global yap (ses bildirimlerinde kullanım için)
 window.sendMessage = sendMessage;
+
