@@ -32,7 +32,7 @@ import { showInfoAlert, showDeleteConfirm } from '../utils/AlertManager';
 
 const { width, height } = Dimensions.get('window');
 
-export default function AnaEkranScreen({ navigation }) {
+function AnaEkranScreen({ navigation }) {
     const {
         userName,
         getColors,
@@ -42,7 +42,9 @@ export default function AnaEkranScreen({ navigation }) {
         chatHistory,
         addChat,
         addMessageToChat,
-        deleteChat
+        deleteChat,
+        sendMessageToAI,
+        isGuestMode // Misafir modu durumu
     } = useContext(AppContext);
 
     const colors = getColors();
@@ -109,6 +111,21 @@ export default function AnaEkranScreen({ navigation }) {
     };
 
     const [oneriler, setOneriler] = useState(getLangBasedSuggestions(language));
+
+    // Misafir modu uyarısı
+    const renderMisafirUyarisi = () => {
+        if (isGuestMode && !activeSohbet) {
+            return (
+                <View style={styles.misafirUyariContainer}>
+                    <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
+                    <Text style={[styles.misafirUyariText, { color: colors.textSecondary }]}>
+                        {t('guestModeActive')}. {t('guestModeChatHistory')}
+                    </Text>
+                </View>
+            );
+        }
+        return null;
+    };
 
     // Sohbetleri yükle
     useFocusEffect(
@@ -211,12 +228,13 @@ export default function AnaEkranScreen({ navigation }) {
 
         requestPermissions();
     }, []);
+
     // chatHistory güncellendiğinde aktif sohbetin referansını yenile
     useEffect(() => {
         if (activeSohbet) {
             const guncel = chatHistory.find(c => c.id === activeSohbet.id);
             if (guncel) {
-                setActiveSohbet(guncel);   // aynı ID’li fakat güncel “messages” dizisi
+                setActiveSohbet(guncel);   // aynı ID'li fakat güncel "messages" dizisi
             }
         }
     }, [chatHistory]);   // ← sadece chatHistory değişince çalışır
@@ -542,7 +560,6 @@ export default function AnaEkranScreen({ navigation }) {
         }
     };
 
-
     const mesajGonder = async () => {
         // 0) Boş mesaj gönderme
         if (!mevcutMesaj.trim()) return;
@@ -556,7 +573,7 @@ export default function AnaEkranScreen({ navigation }) {
             metin: mevcutMesaj.trim(),
             gonderen: 'kullanici',
         };
-        setMevcutMesaj('');                       // input’u temizle
+        setMevcutMesaj('');                       // input'u temizle
 
         try {
             // 2) Aktif sohbet VAR mı YOK mu?
@@ -580,8 +597,8 @@ export default function AnaEkranScreen({ navigation }) {
                     ],
                 };
 
-                await addChat(chat);              // context’e kaydet
-                setActiveSohbet(chat);            // UI’de seç
+                await addChat(chat);              // context'e kaydet
+                setActiveSohbet(chat);            // UI'de seç
                 setSohbetMesajlari(chat.messages);
             } else {
                 // • Mevcut sohbete ekle
@@ -597,21 +614,13 @@ export default function AnaEkranScreen({ navigation }) {
             }
 
             // 3) Gemini API → AI yanıtı
-            const yanit = await GeminiService.generateText(userMsg.metin);
-            const aiMsg = {
-                id: Date.now() + 1,              // basit id
-                metin: yanit,
-                gonderen: 'ai',
-            };
+            // Misafir modunda veya normal modda sendMessageToAI kullanılacak
+            // AppContext bu durumu otomatik olarak yönetecek
+            const success = await sendMessageToAI(chat.id, userMsg.metin);
 
-            await addMessageToChat(chat.id, aiMsg);
-
-            // UI senkronu
-            setSohbetMesajlari(prev => [...prev, aiMsg]);
-            setActiveSohbet(prev => ({
-                ...prev,
-                messages: [...prev.messages, aiMsg],
-            }));
+            if (!success) {
+                throw new Error('AI yanıtı alınamadı');
+            }
         }
         catch (err) {
             console.error('mesajGonder hatası:', err);
@@ -630,7 +639,6 @@ export default function AnaEkranScreen({ navigation }) {
             setIsLoading(false);
         }
     };
-
 
     // Önerilen mesajı gönder
     const oneriGonder = (oneri) => {
@@ -784,6 +792,9 @@ export default function AnaEkranScreen({ navigation }) {
                             </TouchableOpacity>
                         ) : null}
                     </View>
+
+                    {/* Misafir modu uyarısı */}
+                    {renderMisafirUyarisi()}
 
                     {/* Ana içerik alanı - Yenileme ile */}
                     <FlatList
@@ -1175,6 +1186,21 @@ const styles = StyleSheet.create({
     clearButton: {
         padding: 6,
     },
+    misafirUyariContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(138, 43, 226, 0.1)',
+        padding: 12,
+        margin: 15,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(138, 43, 226, 0.2)',
+    },
+    misafirUyariText: {
+        marginLeft: 10,
+        fontSize: 14,
+        flex: 1,
+    },
     bolumBaslik: {
         paddingHorizontal: 15,
         marginTop: 15,
@@ -1548,3 +1574,5 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 });
+
+export default AnaEkranScreen;

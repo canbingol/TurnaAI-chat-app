@@ -125,14 +125,22 @@ const translations = {
         loginFailed: 'Giriş başarısız oldu',
         registrationFailed: 'Kayıt işlemi başarısız oldu',
         profileUpdateFailed: 'Profil güncellemesi başarısız oldu',
+        guestModeActive: 'Misafir modu aktif',
+        guestModeChatHistory: 'Misafir modunda sohbet geçmişi kaydedilmez',
     },
     [LANGUAGES.EN]: {
         // İngilizce çeviriler (değiştirilmedi)
         // ... (kısalık için çıkarıldı)
+        continueAsGuest: 'Continue as Guest',
+        guestModeActive: 'Guest mode active',
+        guestModeChatHistory: 'Chat history is not saved in guest mode',
     },
     [LANGUAGES.FR]: {
         // Fransızca çeviriler (değiştirilmedi)
         // ... (kısalık için çıkarıldı)
+        continueAsGuest: 'Continuer en tant qu\'invité',
+        guestModeActive: 'Mode invité actif',
+        guestModeChatHistory: 'L\'historique des discussions n\'est pas enregistré en mode invité',
     }
 };
 
@@ -144,6 +152,7 @@ export const AppContextProvider = ({ children }) => {
     const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isGuestMode, setIsGuestMode] = useState(false); // Misafir modu durumu
 
     // Kullanıcı profil bilgileri
     const [userName, setUserName] = useState('Misafir Kullanıcı');
@@ -166,6 +175,8 @@ export const AppContextProvider = ({ children }) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (event === 'SIGNED_IN' && session) {
+                    // Misafir modundan çık
+                    setIsGuestMode(false);
                     await loadUserData(session.user.id);
                 } else if (event === 'SIGNED_OUT') {
                     setUser(null);
@@ -173,6 +184,7 @@ export const AppContextProvider = ({ children }) => {
                     setUserEmail('misafir@aiasistan.com');
                     setUserAvatar(null);
                     setChatHistory([]);
+                    setIsGuestMode(false); // Çıkış yapınca misafir modunu da kapat
                 }
             }
         );
@@ -192,6 +204,14 @@ export const AppContextProvider = ({ children }) => {
     const checkSession = async () => {
         setIsLoading(true);
         try {
+            // Önce misafir modu kontrolü
+            const guestMode = await AsyncStorage.getItem('guestMode');
+            if (guestMode === 'true') {
+                setIsGuestMode(true);
+                setIsLoading(false);
+                return;
+            }
+
             const currentUser = await AuthService.getCurrentUser();
             if (currentUser) {
                 await loadUserData(currentUser.id);
@@ -225,27 +245,56 @@ export const AppContextProvider = ({ children }) => {
         }
     };
 
-    // Sohbet geçmişini yükle
+    // AppContextProvider içinde, register•login•logout vb. fonksiyonların hemen yanında
     const loadChatHistory = async (userId) => {
-        try {
-            const conversations = await ChatService.getUserConversations(userId);
+        if (isGuestMode) {
+            setChatHistory([]);
+            return;
+        }
 
-            // Sohbetleri UI için formatla
-            const formattedConversations = conversations.map(conv => ({
+        try {
+            // conversations ve içindeki messages ilişkisel olarak çekiliyor
+            const { data: convs, error } = await supabase
+                .from('conversations')
+                .select(`
+          id,
+          title,
+          updated_at,
+          messages (
+            id,
+            content,
+            is_user,
+            created_at
+          )
+        `)
+                .eq('user_id', userId)
+                .order('updated_at', { ascending: false });
+
+            if (error) {
+                console.error('Supabase fetch error:', error);
+                return;
+            }
+
+            const normalized = convs.map(conv => ({
                 id: conv.id,
                 baslik: conv.title,
-                lastMessageTime: new Date(conv.updated_at).toLocaleTimeString('tr-TR', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }),
-                messages: [] // Sohbet açıldığında mesajlar yüklenecek
+                lastMessageTime: new Date(conv.updated_at)
+                    .toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                messages: (conv.messages || [])
+                    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+                    .map(msg => ({
+                        id: msg.id,
+                        metin: msg.content,
+                        gonderen: msg.is_user ? 'kullanici' : 'ai'
+                    }))
             }));
 
-            setChatHistory(formattedConversations);
-        } catch (error) {
-            console.error('Error loading chat history:', error);
+            setChatHistory(normalized);
+        } catch (err) {
+            console.error('Error loading chat history:', err);
         }
     };
+
 
     // Uygulama ayarlarını yükle
     const loadSettings = async () => {
@@ -266,6 +315,12 @@ export const AppContextProvider = ({ children }) => {
             const storedLanguage = await AsyncStorage.getItem('language');
             if (storedLanguage && Object.values(LANGUAGES).includes(storedLanguage)) {
                 setLanguage(storedLanguage);
+            }
+
+            // Misafir modu ayarını yükle
+            const guestMode = await AsyncStorage.getItem('guestMode');
+            if (guestMode === 'true') {
+                setIsGuestMode(true);
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -303,19 +358,22 @@ export const AppContextProvider = ({ children }) => {
         }
     };
 
-    // Login işlemi
+    // Giriş işlemi
     const login = async (email, password) => {
         setIsLoading(true);
         try {
+            // Misafir modundaysa, çık
+            if (isGuestMode) {
+                setIsGuestMode(false);
+                await AsyncStorage.removeItem('guestMode');
+            }
+
             const user = await AuthService.login(email, password);
             if (!user) {
                 Alert.alert(t('error'), t('invalidCredentials'));
                 setIsLoading(false);
                 return false;
             }
-
-            // Giriş başarılı - kullanıcı verilerini yükle
-            await loadUserData(user.id);
             return true;
         } catch (error) {
             console.error('Login error:', error);
@@ -330,6 +388,12 @@ export const AppContextProvider = ({ children }) => {
     const register = async (name, email, password) => {
         setIsLoading(true);
         try {
+            // Misafir modundaysa, çık
+            if (isGuestMode) {
+                setIsGuestMode(false);
+                await AsyncStorage.removeItem('guestMode');
+            }
+
             const user = await AuthService.register(name, email, password);
             if (!user) {
                 Alert.alert(t('error'), t('registrationFailed'));
@@ -337,8 +401,6 @@ export const AppContextProvider = ({ children }) => {
                 return false;
             }
 
-            // Kayıt başarılı - kullanıcı verilerini yükle
-            await loadUserData(user.id);
             return true;
         } catch (error) {
             console.error('Registration error:', error);
@@ -349,19 +411,53 @@ export const AppContextProvider = ({ children }) => {
         }
     };
 
+    // Misafir olarak devam et
+    const continueAsGuest = async () => {
+        setIsLoading(true);
+        try {
+            // Misafir modu ayarını kaydet
+            setIsGuestMode(true);
+            await AsyncStorage.setItem('guestMode', 'true');
+
+            // Misafir kullanıcı bilgilerini ayarla
+            setUser(null);
+            setUserName('Misafir Kullanıcı');
+            setUserEmail('misafir@aiasistan.com');
+            setUserAvatar(null);
+
+            // Sohbet geçmişini temizle
+            setChatHistory([]);
+
+            return true;
+        } catch (error) {
+            console.error('Guest mode error:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Çıkış işlemi
     const logout = async () => {
         setIsLoading(true);
         try {
-            const success = await AuthService.logout();
-            if (success) {
-                // Çıkış başarılı - kullanıcı state'ini sıfırla
-                setUser(null);
+            // Misafir modundaysa, yalnızca misafir modunu kapat
+            if (isGuestMode) {
+                setIsGuestMode(false);
+                await AsyncStorage.removeItem('guestMode');
+
+                // Misafir bilgilerini sıfırla
                 setUserName('Misafir Kullanıcı');
                 setUserEmail('misafir@aiasistan.com');
                 setUserAvatar(null);
                 setChatHistory([]);
+
+                return true;
+            }
+
+            // Normal çıkış işlemi
+            const success = await AuthService.logout();
+            if (success) {
                 return true;
             }
             return false;
@@ -418,6 +514,12 @@ export const AppContextProvider = ({ children }) => {
     // Yeni sohbet ekle
     const addChat = async (chat) => {
         try {
+            // Misafir modunda sohbeti sadece yerel state'te tut, veritabanına kaydetme
+            if (isGuestMode) {
+                setChatHistory(prev => [chat, ...prev]);
+                return chat.id;
+            }
+
             if (!user) return null;
 
             // Supabase'de konuşma oluştur
@@ -460,6 +562,24 @@ export const AppContextProvider = ({ children }) => {
     // Sohbete mesaj ekle
     const addMessageToChat = async (chatId, message) => {
         try {
+            // Misafir modunda sadece yerel state'i güncelle
+            if (isGuestMode) {
+                setChatHistory(prev => prev.map(chat => {
+                    if (chat.id === chatId) {
+                        return {
+                            ...chat,
+                            lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }),
+                            messages: [...(chat.messages || []), message]
+                        };
+                    }
+                    return chat;
+                }));
+                return true;
+            }
+
             // Supabase'e mesaj ekle
             const newMessage = await ChatService.addMessage(
                 chatId,
@@ -495,6 +615,12 @@ export const AppContextProvider = ({ children }) => {
     // Sohbet sil
     const deleteChat = async (chatId) => {
         try {
+            // Misafir modunda sadece yerel state'ten kaldır
+            if (isGuestMode) {
+                setChatHistory(prev => prev.filter(chat => chat.id !== chatId));
+                return true;
+            }
+
             // Supabase'den konuşmayı sil
             const success = await ChatService.deleteConversation(chatId);
 
@@ -512,6 +638,12 @@ export const AppContextProvider = ({ children }) => {
     // Bir sohbet için mesajları yükle
     const loadChatMessages = async (chatId) => {
         try {
+            // Misafir modunda yerel state'ten al
+            if (isGuestMode) {
+                const chat = chatHistory.find(c => c.id === chatId);
+                return chat?.messages || [];
+            }
+
             const messages = await ChatService.getConversationMessages(chatId);
 
             // Mesajları UI için formatla
@@ -543,7 +675,44 @@ export const AppContextProvider = ({ children }) => {
     // AI'ya mesaj gönder
     const sendMessageToAI = async (chatId, userMessage) => {
         try {
-            // AI etkileşimini işlemek için ChatService kullan
+            // Misafir modunda Gemini doğrudan kullan ve yerel state güncelle
+            if (isGuestMode) {
+                // GeminiService kullanarak AI yanıtı al
+                const aiResponse = await GeminiService.generateText(userMessage);
+
+                const userMsg = {
+                    id: Date.now(),
+                    metin: userMessage,
+                    gonderen: 'kullanici',
+                    created_at: new Date()
+                };
+
+                const aiMsg = {
+                    id: Date.now() + 1,
+                    metin: aiResponse,
+                    gonderen: 'ai',
+                    created_at: new Date()
+                };
+
+                // Yerel state güncelle
+                setChatHistory(prev => prev.map(chat => {
+                    if (chat.id === chatId) {
+                        return {
+                            ...chat,
+                            lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }),
+                            messages: [...(chat.messages || []), userMsg, aiMsg]
+                        };
+                    }
+                    return chat;
+                }));
+
+                return true;
+            }
+
+            // Normal mod: ChatService kullan
             const result = await ChatService.sendMessageToAI(chatId, userMessage);
 
             if (!result) return false;
@@ -596,11 +765,13 @@ export const AppContextProvider = ({ children }) => {
                 userEmail,
                 userAvatar,
                 chatHistory,
+                isGuestMode, // Misafir modu durumunu paylaş
                 getColors,
                 t,
                 login,
                 logout,
                 register,
+                continueAsGuest, // Misafir modu fonksiyonunu paylaş
                 changeTheme,
                 toggleNotifications,
                 changeLanguage,
