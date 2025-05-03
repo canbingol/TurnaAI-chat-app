@@ -3,9 +3,8 @@ import { View, Text, ActivityIndicator, StyleSheet, StatusBar } from 'react-nati
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Import Screens
+// Ekran bileşenleri
 import GirisScreen from './screens/GirisScreen';
 import KayitScreen from './screens/KayitScreen';
 import AnaEkranScreen from './screens/AnaEkranScreen';
@@ -15,7 +14,11 @@ import KullaniciPaneliScreen from './screens/KullaniciPaneliScreen';
 import GenelAyarlarScreen from './screens/GenelAyarlarScreen';
 import CustomDrawerContent from './components/CustomDrawerContent';
 
-// Context yapısı
+// Servisler
+import { supabase } from './services/supabaseConfig';
+import AuthService from './services/AuthService';
+
+// Context provider
 import { AppContext, AppContextProvider } from './context/AppContext';
 
 const Stack = createStackNavigator();
@@ -23,9 +26,9 @@ const Drawer = createDrawerNavigator();
 
 // Tema destekli ana uygulama bileşeni
 function MainApp() {
-  const { getColors, t } = useContext(AppContext);
+  const { getColors, t, isLoading: contextLoading } = useContext(AppContext);
   const [isLoading, setIsLoading] = useState(true);
-  const [userToken, setUserToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Navigasyon teması
   const navigationTheme = {
@@ -44,45 +47,45 @@ function MainApp() {
     // Giriş durumunu kontrol et
     const checkLoginStatus = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        setUserToken(token);
+        // Supabase ile auth kontrolü
+        const isAuth = await AuthService.isAuthenticated();
+        setIsAuthenticated(isAuth);
+
         setTimeout(() => {
           setIsLoading(false);
-        }, 1500); // 1.5 saniyelik bir splash screen gösterelim
-      } catch (e) {
-        console.log(e);
+        }, 1000); // Splash ekranı için 1 saniye gösterme
+      } catch (error) {
+        console.error('Authentication check error:', error);
         setIsLoading(false);
       }
     };
 
     checkLoginStatus();
 
-    // İlk kullanımda örnek kullanıcılar oluştur
-    const initializeUsers = async () => {
-      try {
-        const existingUsers = await AsyncStorage.getItem('users');
-        if (!existingUsers) {
-          // Örnek kullanıcılar
-          const sampleUsers = [
-            {
-              id: '1',
-              name: 'Test Kullanıcı',
-              email: 'test@example.com',
-              password: '123456',
-              avatar: null,
-              createdAt: new Date().toISOString()
-            }
-          ];
-          await AsyncStorage.setItem('users', JSON.stringify(sampleUsers));
+    // Auth durumu değişikliklerini dinle
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth durum değişikliği:', event);
+
+        if (event === 'SIGNED_IN' && session) {
+          setIsAuthenticated(true);
+        } else if (event === 'SIGNED_OUT') {
+          setIsAuthenticated(false);
+        } else if (event === 'USER_UPDATED') {
+          // Kullanıcı bilgileri güncellendi, gerekirse context'i yenileyin
         }
-      } catch (error) {
-        console.error('Kullanıcılar oluşturulurken hata:', error);
+      }
+    );
+
+    return () => {
+      // Bileşen unmount olduğunda subscription'ı temizle
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
       }
     };
-
-    initializeUsers();
   }, []);
 
+  // Ana drawer navigasyonu
   function MainDrawerNavigator() {
     return (
       <Drawer.Navigator
@@ -107,6 +110,7 @@ function MainApp() {
     );
   }
 
+  // Splash ekranı
   function SplashScreen() {
     return (
       <View style={[styles.splashContainer, { backgroundColor: getColors().background }]}>
@@ -116,7 +120,8 @@ function MainApp() {
     );
   }
 
-  if (isLoading) {
+  // Yükleme durumunda splash ekranını göster
+  if (isLoading || contextLoading) {
     return <SplashScreen />;
   }
 
@@ -128,18 +133,18 @@ function MainApp() {
       />
       <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator
-          initialRouteName={userToken ? "Main" : "Giris"}
+          initialRouteName={isAuthenticated ? "Main" : "Giris"}
           screenOptions={{
             headerShown: false,
             cardStyle: { backgroundColor: getColors().background }
           }}
         >
-          <Stack.Screen name="Giris" component={GirisScreen} />
+          <Stack.Screen name="Giris" component={GirisScreen} options={{ animationEnabled: false }} />
           <Stack.Screen name="Kayit" component={KayitScreen} />
           <Stack.Screen
             name="Main"
             component={MainDrawerNavigator}
-            options={{ gestureEnabled: false }}
+            options={{ gestureEnabled: false, animationEnabled: false }}
           />
           <Stack.Screen name="KullaniciPaneli" component={KullaniciPaneliScreen} />
         </Stack.Navigator>

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,356 +10,184 @@ import {
     StatusBar,
     ActivityIndicator,
     Keyboard,
-    TouchableWithoutFeedback,
-    Animated,
-    Easing,
-    Dimensions
+    Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppContext } from '../context/AppContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const { width, height } = Dimensions.get('window');
+import { supabase } from '../services/supabaseConfig';
 
 export default function GirisScreen({ navigation }) {
-    const { login, isLoading, getColors, t } = useContext(AppContext);
-    const colors = getColors();
-
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-
-    // Animasyon değerleri
-    const logoAnim = useRef(new Animated.Value(0)).current;
-    const formAnim = useRef(new Animated.Value(0)).current;
-    const buttonAnim = useRef(new Animated.Value(1)).current;
-    const buttonScaleAnim = useRef(new Animated.Value(1)).current;
-
-    // Logo için döndürme animasyonu
-    const logoRotation = logoAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '360deg']
-    });
-
-    // Giriş animasyonları
-    useEffect(() => {
-        // Logo animasyonu - Döndürme ve yükseltme
-        Animated.sequence([
-            Animated.timing(logoAnim, {
-                toValue: 1,
-                duration: 1000,
-                useNativeDriver: true,
-                easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-            }),
-            // Form alanlarını gösterme
-            Animated.timing(formAnim, {
-                toValue: 1,
-                duration: 800,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.quad)
-            })
-        ]).start();
-
-        // Sürekli olarak logo pulse animasyonu
-        const pulsateAnimation = Animated.loop(
-            Animated.sequence([
-                Animated.timing(buttonAnim, {
-                    toValue: 1.05,
-                    duration: 1500,
-                    useNativeDriver: true,
-                    easing: Easing.inOut(Easing.quad)
-                }),
-                Animated.timing(buttonAnim, {
-                    toValue: 1,
-                    duration: 1500,
-                    useNativeDriver: true,
-                    easing: Easing.inOut(Easing.quad)
-                })
-            ])
-        );
-
-        pulsateAnimation.start();
-
-        return () => {
-            pulsateAnimation.stop();
-        };
-    }, []);
-
-    // Input validasyonu
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        // AsyncStorage'dan kayıtlı kullanıcı bilgilerini kontrol et
-        checkSavedCredentials();
-    }, []);
-
-    const checkSavedCredentials = async () => {
-        try {
-            const savedEmail = await AsyncStorage.getItem('savedEmail');
-            if (savedEmail) {
-                setEmail(savedEmail);
-            }
-        } catch (error) {
-            console.log('Kayıtlı bilgiler yüklenirken hata:', error);
-        }
-    };
-
+    // Basitleştirilmiş giriş fonksiyonu
     const handleLogin = async () => {
-        // Form validasyonu
-        let isValid = true;
+        console.log('Giriş denemesi başlatılıyor...');
 
-        // Email kontrolü
+        // Basit form doğrulama
         if (!email.trim()) {
-            setEmailError(t('emailRequired'));
-            isValid = false;
-        } else if (!/^\S+@\S+\.\S+$/.test(email)) {
-            setEmailError(t('invalidEmail'));
-            isValid = false;
+            setEmailError('E-posta adresi gerekli');
+            return;
         } else {
             setEmailError('');
         }
 
-        // Şifre kontrolü
         if (!password) {
-            setPasswordError(t('passwordRequired'));
-            isValid = false;
-        } else if (password.length < 6) {
-            setPasswordError(t('passwordTooShort'));
-            isValid = false;
+            setPasswordError('Şifre gerekli');
+            return;
         } else {
             setPasswordError('');
         }
 
-        if (!isValid) return;
-
         Keyboard.dismiss();
+        setIsLoading(true);
 
-        // Basit giriş, kullanıcı doğrulamasını kaldırıyoruz
         try {
-            // Kullanıcı doğrulaması olmadan email'i kaydet
-            await AsyncStorage.setItem('savedEmail', email);
-            await AsyncStorage.setItem('userToken', 'demo-token');
+            console.log('Supabase bağlantısı test ediliyor...');
+            console.log('Giriş için kullanılan URL:', supabase.supabaseUrl);
 
-            // Ana ekrana yönlendir
+            // Doğrudan Supabase ile giriş denemesi
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+
+            console.log('Supabase yanıtı alındı');
+
+            if (error) {
+                console.error('Giriş hatası:', error.message);
+                Alert.alert(
+                    'Giriş Hatası',
+                    error.message || 'Geçersiz e-posta veya şifre'
+                );
+                setIsLoading(false);
+                return;
+            }
+
+            console.log('Giriş başarılı, session data:', data?.session ? 'Var' : 'Yok');
+
+            if (!data || !data.user) {
+                console.error('Kullanıcı verisi alınamadı');
+                Alert.alert(
+                    'Giriş Sorunu',
+                    'Giriş başarılı ancak kullanıcı bilgileri alınamadı.'
+                );
+                setIsLoading(false);
+                return;
+            }
+
+            console.log('Kullanıcı ID:', data.user.id);
+            console.log('Ana ekrana yönlendiriliyor...');
+
+            // Başarılı giriş - ana ekrana yönlendir
             navigation.replace('Main');
         } catch (error) {
-            console.log('Giriş işlemi sırasında hata:', error);
+            console.error('Beklenmeyen giriş hatası:', error);
+            Alert.alert(
+                'Bağlantı Hatası',
+                'Giriş sırasında beklenmeyen bir hata oluştu: ' + error.message
+            );
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleMisafirGirisi = () => {
-        // Misafir girişi animasyonu
-        Animated.sequence([
-            Animated.timing(buttonScaleAnim, {
-                toValue: 0.9,
-                duration: 100,
-                useNativeDriver: true
-            }),
-            Animated.timing(buttonScaleAnim, {
-                toValue: 1,
-                duration: 100,
-                useNativeDriver: true
-            })
-        ]).start(() => {
-            // Misafir girişi
-            navigation.replace('Main');
-        });
-    };
-
-    // Buton basma animasyonu
-    const onPressIn = () => {
-        Animated.timing(buttonScaleAnim, {
-            toValue: 0.95,
-            duration: 100,
-            useNativeDriver: true
-        }).start();
-    };
-
-    const onPressOut = () => {
-        Animated.timing(buttonScaleAnim, {
-            toValue: 1,
-            duration: 100,
-            useNativeDriver: true
-        }).start();
-    };
-
     return (
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-                <StatusBar backgroundColor={colors.statusBar} barStyle="light-content" />
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" />
 
-                <View style={styles.logoContainer}>
-                    <Animated.Image
-                        source={require('../assets/turna-logo.svg')}
-                        style={[
-                            styles.logo,
-                            {
-                                transform: [
-                                    { rotate: logoRotation },
-                                    { scale: buttonAnim }
-                                ]
-                            }
-                        ]}
-                        resizeMode="contain"
+            <View style={styles.logoContainer}>
+                <Text style={styles.title}>Giriş Testi</Text>
+            </View>
+
+            <View style={styles.formContainer}>
+                {/* E-posta giriş alanı */}
+                <View style={styles.inputContainer}>
+                    <Ionicons name="mail-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="E-posta"
+                        placeholderTextColor="#888"
+                        value={email}
+                        onChangeText={(text) => {
+                            setEmail(text);
+                            setEmailError('');
+                        }}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
                     />
-                    <Animated.Text
-                        style={[
-                            styles.title,
-                            {
-                                color: colors.primary,
-                                opacity: logoAnim,
-                                transform: [{
-                                    translateY: logoAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [20, 0]
-                                    })
-                                }]
-                            }
-                        ]}
-                    >
-                        Turna AI
-                    </Animated.Text>
-                    <Animated.Text
-                        style={[
-                            styles.subtitle,
-                            {
-                                color: colors.textSecondary,
-                                opacity: logoAnim,
-                                transform: [{
-                                    translateY: logoAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [20, 0]
-                                    })
-                                }]
-                            }
-                        ]}
-                    >
-                        {t('aiAssistantByYourSide')}
-                    </Animated.Text>
                 </View>
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-                <Animated.View
-                    style={[
-                        styles.formContainer,
-                        {
-                            opacity: formAnim,
-                            transform: [{
-                                translateY: formAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [50, 0]
-                                })
-                            }]
-                        }
-                    ]}
-                >
-                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        <Ionicons name="mail-outline" size={24} color={colors.primary} style={styles.inputIcon} />
-                        <TextInput
-                            style={[styles.input, { color: colors.text }]}
-                            placeholder={t('email')}
-                            placeholderTextColor={colors.textSecondary}
-                            value={email}
-                            onChangeText={(text) => {
-                                setEmail(text);
-                                setEmailError('');
-                            }}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-                    </View>
-                    {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-
-                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        <Ionicons name="lock-closed-outline" size={24} color={colors.primary} style={styles.inputIcon} />
-                        <TextInput
-                            style={[styles.input, { color: colors.text }]}
-                            placeholder={t('password')}
-                            placeholderTextColor={colors.textSecondary}
-                            value={password}
-                            onChangeText={(text) => {
-                                setPassword(text);
-                                setPasswordError('');
-                            }}
-                            secureTextEntry={!isPasswordVisible}
-                        />
-                        <TouchableOpacity
-                            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                            style={styles.passwordVisibilityToggle}
-                        >
-                            <Ionicons
-                                name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
-                                size={24}
-                                color={colors.textSecondary}
-                            />
-                        </TouchableOpacity>
-                    </View>
-                    {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-
-                    <TouchableOpacity style={styles.forgotPassword}>
-                        <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>{t('forgotPassword')}</Text>
-                    </TouchableOpacity>
-
-                    <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-                        <TouchableOpacity
-                            style={[styles.loginButton, { backgroundColor: colors.primary }]}
-                            onPress={handleLogin}
-                            disabled={isLoading}
-                            onPressIn={onPressIn}
-                            onPressOut={onPressOut}
-                        >
-                            {isLoading ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : (
-                                <Text style={styles.loginButtonText}>{t('login')}</Text>
-                            )}
-                        </TouchableOpacity>
-                    </Animated.View>
-
+                {/* Şifre giriş alanı */}
+                <View style={styles.inputContainer}>
+                    <Ionicons name="lock-closed-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Şifre"
+                        placeholderTextColor="#888"
+                        value={password}
+                        onChangeText={(text) => {
+                            setPassword(text);
+                            setPasswordError('');
+                        }}
+                        secureTextEntry={!isPasswordVisible}
+                    />
                     <TouchableOpacity
-                        style={[styles.misafirButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-                        onPress={handleMisafirGirisi}
+                        onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                        style={styles.passwordVisibilityToggle}
                     >
-                        <Text style={[styles.misafirButtonText, { color: colors.primary }]}>{t('continueAsGuest')}</Text>
+                        <Ionicons
+                            name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+                            size={24}
+                            color="#888"
+                        />
                     </TouchableOpacity>
-
-                    <View style={styles.registerContainer}>
-                        <Text style={[styles.registerText, { color: colors.textSecondary }]}>{t('noAccount')}</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Kayit')}>
-                            <Text style={[styles.registerLink, { color: colors.primary }]}>{t('register')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                </Animated.View>
-
-                <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('version')} 1.0.0</Text>
                 </View>
-            </SafeAreaView>
-        </TouchableWithoutFeedback>
+                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+
+                {/* Giriş butonu */}
+                <TouchableOpacity
+                    style={styles.loginButton}
+                    onPress={handleLogin}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                        <Text style={styles.loginButtonText}>Giriş Yap</Text>
+                    )}
+                </TouchableOpacity>
+
+                {/* Kayıt yönlendirme */}
+                <View style={styles.registerContainer}>
+                    <Text style={styles.registerText}>Hesabın yok mu?</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Kayit')}>
+                        <Text style={styles.registerLink}>Kayıt Ol</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#121212',
     },
     logoContainer: {
         alignItems: 'center',
         marginTop: 60,
         marginBottom: 40,
     },
-    logo: {
-        width: 120,
-        height: 120,
-        marginBottom: 10,
-    },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-    },
-    subtitle: {
-        fontSize: 16,
-        marginTop: 5,
+        color: '#8A2BE2',
     },
     formContainer: {
         paddingHorizontal: 30,
@@ -367,15 +195,10 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#1E1E1E',
         borderRadius: 12,
-        marginBottom: 5,
+        marginBottom: 8,
         paddingHorizontal: 15,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.5,
-        borderWidth: 1,
     },
     inputIcon: {
         marginRight: 10,
@@ -384,69 +207,43 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 14,
         fontSize: 16,
+        color: '#FFFFFF',
     },
     passwordVisibilityToggle: {
-        padding: 10,
+        padding: 8,
     },
     errorText: {
         color: '#FF4757',
         fontSize: 12,
         marginLeft: 15,
-        marginBottom: 10,
-    },
-    forgotPassword: {
-        alignSelf: 'flex-end',
-        marginBottom: 20,
-    },
-    forgotPasswordText: {
-        fontSize: 14,
+        marginBottom: 12,
     },
     loginButton: {
+        backgroundColor: '#8A2BE2',
         borderRadius: 12,
         paddingVertical: 15,
         alignItems: 'center',
+        marginTop: 20,
         marginBottom: 15,
-        elevation: 3,
-        shadowColor: '#8A2BE2',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
     },
     loginButtonText: {
         color: '#FFFFFF',
         fontSize: 18,
         fontWeight: 'bold',
     },
-    misafirButton: {
-        borderRadius: 12,
-        paddingVertical: 15,
-        alignItems: 'center',
-        marginBottom: 20,
-        borderWidth: 1,
-    },
-    misafirButtonText: {
-        fontSize: 16,
-    },
     registerContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: 10,
+        marginTop: 15,
     },
     registerText: {
+        color: '#888',
         marginRight: 5,
         fontSize: 16,
     },
     registerLink: {
         fontWeight: 'bold',
         fontSize: 16,
-    },
-    footer: {
-        position: 'absolute',
-        bottom: 20,
-        width: '100%',
-        alignItems: 'center',
-    },
-    footerText: {
-        fontSize: 12,
+        color: '#8A2BE2',
     },
 });
