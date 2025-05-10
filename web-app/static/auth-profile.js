@@ -17,39 +17,46 @@ document.addEventListener('DOMContentLoaded', function () {
     const guestLoginBtn = document.querySelector('.guest-login-btn');
 
     // CSS stillerini doğrudan ekle
+    // CSS stillerini doğrudan ekle
     const styleElement = document.createElement('style');
     styleElement.textContent = `
-        .profile-card-overlay {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background-color: rgba(0, 0, 0, 0.7) !important;
-            z-index: 9999 !important;
-            display: none !important;
-            justify-content: center !important;
-            align-items: center !important;
-        }
-        
-        .profile-card-overlay.visible {
-            display: flex !important;
-        }
-        
-        .profile-card {
-            display: none !important;
-            background-color: var(--dark-gray) !important;
-            width: 90% !important;
-            max-width: 500px !important;
-            border-radius: 12px !important;
-            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3) !important;
-            z-index: 10000 !important;
-        }
-        
-        .profile-card.visible {
-            display: block !important;
-        }
-    `;
+    .profile-card-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        z-index: 9999 !important;
+        display: none !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    
+    .profile-card-overlay.visible {
+        display: flex !important;
+    }
+    
+    .profile-card {
+        display: none !important;
+        position: fixed !important; /* relative yerine fixed */
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        background-color: var(--dark-gray) !important;
+        width: 90% !important;
+        max-width: 500px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3) !important;
+        z-index: 10000 !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+    }
+    
+    .profile-card.visible {
+        display: block !important;
+    }
+`;
     document.head.appendChild(styleElement);
 
     // Veritabanı bağlantı durumunu kontrol et
@@ -135,39 +142,54 @@ document.addEventListener('DOMContentLoaded', function () {
         authModal.classList.remove('show');
     }
 
-    // Profil kartlarını gösterme fonksiyonu - Tamamen yeniden yazıldı
+
     function showProfileCard(cardId) {
         console.log('showProfileCard çağrıldı:', cardId);
 
+        // Önce overlay'i göster
+        profileCardOverlay.style.display = 'flex';
+        profileCardOverlay.style.opacity = '0';
+        profileCardOverlay.classList.add('visible');
+
+        // Animasyon için küçük bir gecikme
+        setTimeout(() => {
+            profileCardOverlay.style.opacity = '1';
+        }, 10);
+
         // Tüm kartları gizle
         profileCards.forEach(card => {
+            card.style.display = 'none';
             card.classList.remove('visible');
         });
 
         // İstenen kartı göster
         const card = document.getElementById(cardId);
         if (card) {
+            card.style.display = 'block';
             card.classList.add('visible');
             console.log('Kart gösteriliyor:', cardId);
         } else {
             console.error('Kart bulunamadı:', cardId);
         }
-
-        // Overlay'i göster
-        profileCardOverlay.classList.add('visible');
     }
 
-    // Profil kartlarını gizleme fonksiyonu - Tamamen yeniden yazıldı
     function hideProfileCards() {
         console.log('hideProfileCards çağrıldı');
 
-        // Overlay'i gizle
-        profileCardOverlay.classList.remove('visible');
+        // Animasyonlu kapanma
+        profileCardOverlay.style.opacity = '0';
 
-        // Tüm kartları gizle
-        profileCards.forEach(card => {
-            card.classList.remove('visible');
-        });
+        setTimeout(() => {
+            // Overlay'i gizle
+            profileCardOverlay.style.display = 'none';
+            profileCardOverlay.classList.remove('visible');
+
+            // Tüm kartları gizle
+            profileCards.forEach(card => {
+                card.style.display = 'none';
+                card.classList.remove('visible');
+            });
+        }, 300);
     }
 
     // Profil linki tıklama olayı
@@ -455,7 +477,10 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.add('active');
             const tabName = this.getAttribute('data-tab');
             const contentId = tabName + '-content';
-            document.getElementById(contentId).classList.add('active');
+            const contentElement = document.getElementById(contentId);
+            if (contentElement) {
+                contentElement.classList.add('active');
+            }
         });
     });
 
