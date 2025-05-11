@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator, StyleSheet, StatusBar } from 'react-nati
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Ekran bileşenleri
 import GirisScreen from './screens/GirisScreen';
@@ -26,7 +27,7 @@ const Drawer = createDrawerNavigator();
 
 // Tema destekli ana uygulama bileşeni
 function MainApp() {
-  const { getColors, t, isLoading: contextLoading } = useContext(AppContext);
+  const { getColors, t, isLoading: contextLoading, isGuestMode, user } = useContext(AppContext);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -47,13 +48,23 @@ function MainApp() {
     // Giriş durumunu kontrol et
     const checkLoginStatus = async () => {
       try {
-        // Supabase ile auth kontrolü
+        // Misafir modu kontrolü
+        const guestMode = await AsyncStorage.getItem('guestMode');
+        if (guestMode === 'true') {
+          console.log('Misafir modu aktif - Ana ekrana yönlendiriliyor');
+          setIsAuthenticated(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Normal auth kontrolü
         const isAuth = await AuthService.isAuthenticated();
         setIsAuthenticated(isAuth);
+        console.log('Auth durumu:', isAuth ? 'Giriş yapılmış' : 'Giriş yapılmamış');
 
         setTimeout(() => {
           setIsLoading(false);
-        }, 1000); // Splash ekranı için 1 saniye gösterme
+        }, 1000);
       } catch (error) {
         console.error('Authentication check error:', error);
         setIsLoading(false);
@@ -65,20 +76,24 @@ function MainApp() {
     // Auth durumu değişikliklerini dinle
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth durum değişikliği:', event);
+        console.log('App.js - Auth durum değişikliği:', event);
 
         if (event === 'SIGNED_IN' && session) {
           setIsAuthenticated(true);
         } else if (event === 'SIGNED_OUT') {
-          setIsAuthenticated(false);
-        } else if (event === 'USER_UPDATED') {
-          // Kullanıcı bilgileri güncellendi, gerekirse context'i yenileyin
+          // Misafir modu kontrolü
+          const guestMode = await AsyncStorage.getItem('guestMode');
+          if (guestMode === 'true') {
+            console.log('Misafir modunda, auth durumu korunuyor');
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+          }
         }
       }
     );
 
     return () => {
-      // Bileşen unmount olduğunda subscription'ı temizle
       if (authListener && authListener.subscription) {
         authListener.subscription.unsubscribe();
       }
@@ -125,6 +140,9 @@ function MainApp() {
     return <SplashScreen />;
   }
 
+  // Misafir modu veya user varsa authenticated kabul et
+  const shouldShowMain = isAuthenticated || isGuestMode || user;
+
   return (
     <View style={{ flex: 1 }}>
       <StatusBar
@@ -133,7 +151,7 @@ function MainApp() {
       />
       <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator
-          initialRouteName={isAuthenticated ? "Main" : "Giris"}
+          initialRouteName={shouldShowMain ? "Main" : "Giris"}
           screenOptions={{
             headerShown: false,
             cardStyle: { backgroundColor: getColors().background }

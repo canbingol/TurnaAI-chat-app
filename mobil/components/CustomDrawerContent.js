@@ -19,7 +19,10 @@ import { AppContext } from '../context/AppContext';
 import { CommonActions } from '@react-navigation/native';
 
 function CustomDrawerContent(props) {
-    const { userName, userEmail, userAvatar, logout } = useContext(AppContext);
+    const { userName, userEmail, userAvatar, logout, getColors, t } = useContext(AppContext);
+
+    // Tema renklerini al
+    const colors = getColors();
 
     // Animasyon değerleri
     const [fadeAnim] = useState(new Animated.Value(0));
@@ -124,7 +127,7 @@ function CustomDrawerContent(props) {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Üst Arka Plan */}
             <ImageBackground
                 source={require('../assets/drawer-background.jpg')}
@@ -135,6 +138,7 @@ function CustomDrawerContent(props) {
                     style={[
                         styles.profileContainer,
                         {
+                            backgroundColor: 'rgba(0,0,0,0.7)',
                             opacity: fadeAnim,
                             transform: [{ translateY: slideAnim }]
                         }
@@ -142,7 +146,7 @@ function CustomDrawerContent(props) {
                 >
                     <Image
                         source={userAvatar ? { uri: userAvatar } : require('../assets/default-profile.png')}
-                        style={styles.profileImage}
+                        style={[styles.profileImage, { borderColor: colors.primary }]}
                     />
                     <View style={styles.profileInfo}>
                         <Text style={styles.profileName}>{userName}</Text>
@@ -162,119 +166,123 @@ function CustomDrawerContent(props) {
                     <TouchableOpacity
                         style={[
                             styles.drawerItem,
-                            isActiveScreen('Ana Ekran') && styles.activeDrawerItem
+                            isActiveScreen('Ana Ekran') && [styles.activeDrawerItem, { backgroundColor: colors.primary }]
                         ]}
                         onPress={() => navigateToScreen('Ana Ekran')}
                     >
                         <Ionicons
                             name="home-outline"
                             size={24}
-                            color={isActiveScreen('Ana Ekran') ? "#FFFFFF" : "#8A2BE2"}
+                            color={isActiveScreen('Ana Ekran') ? "#FFFFFF" : colors.primary}
                         />
                         <Text style={[
                             styles.drawerItemText,
+                            { color: colors.text },
                             isActiveScreen('Ana Ekran') && styles.activeDrawerItemText
-                        ]}>Ana Ekran</Text>
+                        ]}>{t('home')}</Text>
                     </TouchableOpacity>
 
                     {/* Profil butonu */}
                     <TouchableOpacity
                         style={[
                             styles.drawerItem,
-                            isActiveScreen('Profil') && styles.activeDrawerItem
+                            isActiveScreen('Profil') && [styles.activeDrawerItem, { backgroundColor: colors.primary }]
                         ]}
                         onPress={() => navigateToScreen('Profil')}
                     >
                         <Ionicons
                             name="person-outline"
                             size={24}
-                            color={isActiveScreen('Profil') ? "#FFFFFF" : "#8A2BE2"}
+                            color={isActiveScreen('Profil') ? "#FFFFFF" : colors.primary}
                         />
                         <Text style={[
                             styles.drawerItemText,
+                            { color: colors.text },
                             isActiveScreen('Profil') && styles.activeDrawerItemText
-                        ]}>Profil</Text>
+                        ]}>{t('profile')}</Text>
                     </TouchableOpacity>
 
                     {/* Yardım butonu */}
                     <TouchableOpacity
                         style={[
                             styles.drawerItem,
-                            isActiveScreen('Yardım') && styles.activeDrawerItem
+                            isActiveScreen('Yardım') && [styles.activeDrawerItem, { backgroundColor: colors.primary }]
                         ]}
                         onPress={() => navigateToScreen('Yardım')}
                     >
                         <Ionicons
                             name="help-circle-outline"
                             size={24}
-                            color={isActiveScreen('Yardım') ? "#FFFFFF" : "#8A2BE2"}
+                            color={isActiveScreen('Yardım') ? "#FFFFFF" : colors.primary}
                         />
                         <Text style={[
                             styles.drawerItemText,
+                            { color: colors.text },
                             isActiveScreen('Yardım') && styles.activeDrawerItemText
-                        ]}>Yardım</Text>
+                        ]}>{t('help')}</Text>
                     </TouchableOpacity>
 
                     {/* Ayarlar butonu */}
                     <TouchableOpacity
                         style={[
                             styles.drawerItem,
-                            isActiveScreen('Ayarlar') && styles.activeDrawerItem
+                            isActiveScreen('Ayarlar') && [styles.activeDrawerItem, { backgroundColor: colors.primary }]
                         ]}
                         onPress={() => navigateToScreen('Ayarlar')}
                     >
                         <Ionicons
                             name="settings-outline"
                             size={24}
-                            color={isActiveScreen('Ayarlar') ? "#FFFFFF" : "#8A2BE2"}
+                            color={isActiveScreen('Ayarlar') ? "#FFFFFF" : colors.primary}
                         />
                         <Text style={[
                             styles.drawerItemText,
+                            { color: colors.text },
                             isActiveScreen('Ayarlar') && styles.activeDrawerItemText
-                        ]}>Ayarlar</Text>
+                        ]}>{t('settings')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Ek Menü Elemanları */}
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
                 <View style={styles.drawerSection}>
-                    <Text style={styles.sectionTitle}>Yardım & Bilgi</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('helpandInfo')}</Text>
 
                     <TouchableOpacity
-                        style={styles.drawerItem}
+                        style={[styles.drawerItem, { backgroundColor: colors.background }]}
                         onPress={showFAQ}
                     >
-                        <Ionicons name="information-circle-outline" size={24} color="#8A2BE2" />
-                        <Text style={styles.drawerItemText}>Sık Sorulan Sorular</Text>
+                        <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
+                        <Text style={[styles.drawerItemText, { color: colors.text }]}>{t('faq')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.drawerItem}
+                        style={[styles.drawerItem, { backgroundColor: colors.background }]}
                         onPress={showContact}
                     >
-                        <Ionicons name="mail-outline" size={24} color="#8A2BE2" />
-                        <Text style={styles.drawerItemText}>İletişim</Text>
+                        <Ionicons name="mail-outline" size={24} color={colors.primary} />
+                        <Text style={[styles.drawerItemText, { color: colors.text }]}>{t('contact')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.drawerItem}
-                        onPress={() => Alert.alert('Bilgi', 'Uygulama sürümü: 1.0.0\n© 2025 Turna AI Tüm Hakları Saklıdır')}
+                        style={[styles.drawerItem, { backgroundColor: colors.background }]}
+                        onPress={() => Alert.alert(t('info'), `${t('version')}: 1.0.0\n© 2025 Turna AI ${t('allRightsReserved')}`)}
                     >
-                        <Ionicons name="information" size={24} color="#8A2BE2" />
-                        <Text style={styles.drawerItemText}>Uygulama Hakkında</Text>
+                        <Ionicons name="information" size={24} color={colors.primary} />
+                        <Text style={[styles.drawerItemText, { color: colors.text }]}>{t('about')}</Text>
                     </TouchableOpacity>
                 </View>
             </DrawerContentScrollView>
 
             {/* Alt Eylemler */}
-            <View style={styles.bottomSection}>
+            <View style={[styles.bottomSection, { borderTopColor: colors.border }]}>
                 <TouchableOpacity
                     style={styles.logoutButton}
                     onPress={handleLogout}
                 >
                     <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
-                    <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
+                    <Text style={styles.logoutButtonText}>{t('logout')}</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -284,7 +292,6 @@ function CustomDrawerContent(props) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
     },
     headerBackground: {
         width: '100%',
@@ -295,7 +302,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 20,
-        backgroundColor: 'rgba(0,0,0,0.7)',
     },
     profileImage: {
         width: 60,
@@ -303,7 +309,6 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         marginRight: 15,
         borderWidth: 2,
-        borderColor: '#8A2BE2',
     },
     profileInfo: {
         justifyContent: 'center',
@@ -324,7 +329,6 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     sectionTitle: {
-        color: '#666',
         fontSize: 14,
         marginLeft: 16,
         marginVertical: 10,
@@ -343,7 +347,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#8A2BE2',
     },
     drawerItemText: {
-        color: '#FFFFFF',
         marginLeft: 16,
         fontSize: 16,
     },
@@ -353,13 +356,11 @@ const styles = StyleSheet.create({
     },
     divider: {
         height: 1,
-        backgroundColor: 'rgba(255,255,255,0.1)',
         marginVertical: 12,
         marginHorizontal: 16,
     },
     bottomSection: {
         padding: 16,
-        borderTopColor: 'rgba(255,255,255,0.1)',
         borderTopWidth: 1,
     },
     logoutButton: {
@@ -390,4 +391,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default CustomDrawerContent;
+export default CustomDrawerContent; 

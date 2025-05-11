@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import AuthService from '../services/AuthService';
 import ChatService from '../services/ChatService';
 import { supabase } from '../services/supabaseConfig';
+import GeminiService from '../services/GeminiService';
 
 export const AppContext = createContext();
 
@@ -153,12 +154,13 @@ export const AppContextProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isGuestMode, setIsGuestMode] = useState(false); // Misafir modu durumu
-
+    const [guestMessageCount, setGuestMessageCount] = useState(0);
+    const [navigationReady, setNavigationReady] = useState(false);
     // Kullanıcı profil bilgileri
     const [userName, setUserName] = useState('Misafir Kullanıcı');
     const [userEmail, setUserEmail] = useState('misafir@aiasistan.com');
     const [userAvatar, setUserAvatar] = useState(null);
-
+    const [activeSohbet, setActiveSohbet] = useState(null);
     // Sohbet geçmişi
     const [chatHistory, setChatHistory] = useState([]);
 
@@ -172,22 +174,48 @@ export const AppContextProvider = ({ children }) => {
 
     // Supabase auth state dinleyici
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                if (event === 'SIGNED_IN' && session) {
-                    // Misafir modundan çık
-                    setIsGuestMode(false);
-                    await loadUserData(session.user.id);
-                } else if (event === 'SIGNED_OUT') {
-                    setUser(null);
-                    setUserName('Misafir Kullanıcı');
-                    setUserEmail('misafir@aiasistan.com');
-                    setUserAvatar(null);
-                    setChatHistory([]);
-                    setIsGuestMode(false); // Çıkış yapınca misafir modunu da kapat
+        // Auth değişiklik dinleyicisini sakla
+        let authSubscription;
+
+        const setupAuthListener = () => {
+            const { data } = supabase.auth.onAuthStateChange(
+                async (event, session) => {
+                    console.log('Auth state değişikliği:', event);
+
+                    // Misafir moduna geçiş yapılıyorsa, SIGNED_OUT eventini yoksay
+                    const guestModeInProgress = await AsyncStorage.getItem('guestModeInProgress');
+                    if (guestModeInProgress === 'true' && event === 'SIGNED_OUT') {
+                        console.log('Misafir moduna geçiş yapılıyor, SIGNED_OUT eventi yoksayıldı');
+                        await AsyncStorage.removeItem('guestModeInProgress');
+                        return;
+                    }
+
+                    if (event === 'SIGNED_IN' && session) {
+                        console.log('Kullanıcı giriş yaptı');
+                        // Misafir modunu kapat
+                        setIsGuestMode(false);
+                        setGuestMessageCount(0);
+                        await AsyncStorage.removeItem('guestMode');
+                        await AsyncStorage.removeItem('guestMessageCount');
+                        // Kullanıcı verilerini yükle
+                        await loadUserData(session.user.id);
+                    } else if (event === 'SIGNED_OUT' && !isGuestMode) {
+                        console.log('Kullanıcı çıkış yaptı');
+                        // Normal çıkış - state'leri sıfırla
+                        setUser(null);
+                        setUserName('');
+                        setUserEmail('');
+                        setUserAvatar(null);
+                        setChatHistory([]);
+                        setActiveSohbet(null);
+                    }
                 }
-            }
-        );
+            );
+
+            authSubscription = data.subscription;
+        };
+
+        setupAuthListener();
 
         // İlk oturum kontrolü
         checkSession();
@@ -196,7 +224,9 @@ export const AppContextProvider = ({ children }) => {
         loadSettings();
 
         return () => {
-            subscription?.unsubscribe();
+            if (authSubscription) {
+                authSubscription.unsubscribe();
+            }
         };
     }, []);
 
@@ -206,15 +236,41 @@ export const AppContextProvider = ({ children }) => {
         try {
             // Önce misafir modu kontrolü
             const guestMode = await AsyncStorage.getItem('guestMode');
+
             if (guestMode === 'true') {
+                console.log('Misafir modu aktif');
                 setIsGuestMode(true);
+
+                // Misafir mesaj sayısını yükle
+                const messageCount = await AsyncStorage.getItem('guestMessageCount');
+                if (messageCount) {
+                    setGuestMessageCount(parseInt(messageCount));
+                }
+
+                // Misafir kullanıcı bilgilerini ayarla
+                setUserName('Misafir Kullanıcı');
+                setUserEmail('misafir@aiasistan.com');
+                setUserAvatar(null);
+                setChatHistory([]);
+
                 setIsLoading(false);
                 return;
             }
 
-            const currentUser = await AuthService.getCurrentUser();
-            if (currentUser) {
-                await loadUserData(currentUser.id);
+            // Normal kullanıcı kontrolü
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (session && session.user) {
+                console.log('Aktif oturum bulundu');
+                await loadUserData(session.user.id);
+            } else {
+                console.log('Aktif oturum yok');
+                // Varsayılan değerleri ayarla
+                setUser(null);
+                setUserName('');
+                setUserEmail('');
+                setUserAvatar(null);
+                setChatHistory([]);
             }
         } catch (error) {
             console.error('Session check error:', error);
@@ -227,16 +283,32 @@ export const AppContextProvider = ({ children }) => {
     const loadUserData = async (userId) => {
         setIsLoading(true);
         try {
-            // Kullanıcı profilini al
-            const userData = await AuthService.getCurrentUser();
-            if (userData) {
-                setUser(userData);
-                setUserName(userData.name || 'Kullanıcı');
-                setUserEmail(userData.email);
-                setUserAvatar(userData.avatar_url);
+            // Önce Supabase auth'dan kullanıcı bilgilerini al
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (user) {
+                // Temel kullanıcı bilgilerini ayarla
+                setUser(user);
+                setUserEmail(user.email);
+
+                // Users tablosundan detaylı bilgileri al
+                const { data: userData, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                if (userData && !error) {
+                    setUserName(userData.name || user.email.split('@')[0]);
+                    setUserAvatar(userData.avatar_url);
+                } else {
+                    // Users tablosunda kayıt yoksa yalnızca auth bilgilerini kullan
+                    setUserName(user.user_metadata?.name || user.email.split('@')[0]);
+                    setUserAvatar(null);
+                }
 
                 // Kullanıcının sohbet geçmişini yükle
-                await loadChatHistory(userId);
+                await loadChatHistory(user.id);
             }
         } catch (error) {
             console.error('Error loading user data:', error);
@@ -253,25 +325,31 @@ export const AppContextProvider = ({ children }) => {
         }
 
         try {
-            // conversations ve içindeki messages ilişkisel olarak çekiliyor
             const { data: convs, error } = await supabase
                 .from('conversations')
                 .select(`
-          id,
-          title,
-          updated_at,
-          messages (
-            id,
-            content,
-            is_user,
-            created_at
-          )
-        `)
+                    id,
+                    title,
+                    updated_at,
+                    messages (
+                        id,
+                        content,
+                        is_user,
+                        created_at
+                    )
+                `)
                 .eq('user_id', userId)
                 .order('updated_at', { ascending: false });
 
             if (error) {
                 console.error('Supabase fetch error:', error);
+                setChatHistory([]);
+                return;
+            }
+
+            // Boş veya null değeri kontrol et
+            if (!convs || convs.length === 0) {
+                setChatHistory([]);
                 return;
             }
 
@@ -292,6 +370,7 @@ export const AppContextProvider = ({ children }) => {
             setChatHistory(normalized);
         } catch (err) {
             console.error('Error loading chat history:', err);
+            setChatHistory([]);
         }
     };
 
@@ -362,19 +441,37 @@ export const AppContextProvider = ({ children }) => {
     const login = async (email, password) => {
         setIsLoading(true);
         try {
-            // Misafir modundaysa, çık
-            if (isGuestMode) {
-                setIsGuestMode(false);
-                await AsyncStorage.removeItem('guestMode');
-            }
+            // Önce misafir modunu temizle
+            setIsGuestMode(false);
+            setGuestMessageCount(0);
+            await AsyncStorage.removeItem('guestMode');
+            await AsyncStorage.removeItem('guestMessageCount');
 
-            const user = await AuthService.login(email, password);
-            if (!user) {
+            // Mevcut oturumu kapat
+            await supabase.auth.signOut();
+
+            // Yeni giriş yap
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                console.error('Giriş hatası:', error);
                 Alert.alert(t('error'), t('invalidCredentials'));
-                setIsLoading(false);
                 return false;
             }
-            return true;
+
+            if (data.user) {
+                console.log('Giriş başarılı, kullanıcı yükleniyor...');
+
+                // Kullanıcı bilgilerini yükle
+                await loadUserData(data.user.id);
+
+                return true;
+            }
+
+            return false;
         } catch (error) {
             console.error('Login error:', error);
             Alert.alert(t('error'), error.message || t('loginFailed'));
@@ -392,16 +489,54 @@ export const AppContextProvider = ({ children }) => {
             if (isGuestMode) {
                 setIsGuestMode(false);
                 await AsyncStorage.removeItem('guestMode');
+                await AsyncStorage.removeItem('guestMessageCount');
+                setGuestMessageCount(0);
             }
 
-            const user = await AuthService.register(name, email, password);
-            if (!user) {
-                Alert.alert(t('error'), t('registrationFailed'));
-                setIsLoading(false);
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        name: name
+                    }
+                }
+            });
+
+            if (error) {
+                console.error('Kayıt hatası:', error);
+                Alert.alert(t('error'), error.message);
                 return false;
             }
 
-            return true;
+            if (data.user) {
+                // Users tablosuna kayıt ekle
+                try {
+                    const { error: userError } = await supabase
+                        .from('users')
+                        .insert({
+                            id: data.user.id,
+                            name: name,
+                            email: email,
+                            password_hash: 'auth_managed',
+                            created_at: new Date(),
+                            updated_at: new Date()
+                        });
+
+                    if (userError) {
+                        console.error('Users tablosuna kayıt hatası:', userError);
+                        // Hata olsa bile devam et, auth kaydı başarılı
+                    }
+                } catch (dbError) {
+                    console.error('DB kayıt hatası:', dbError);
+                }
+
+                // Otomatik giriş yap
+                const loginSuccess = await login(email, password);
+                return loginSuccess;
+            }
+
+            return false;
         } catch (error) {
             console.error('Registration error:', error);
             Alert.alert(t('error'), error.message || t('registrationFailed'));
@@ -411,26 +546,52 @@ export const AppContextProvider = ({ children }) => {
         }
     };
 
-    // Misafir olarak devam et
     const continueAsGuest = async () => {
-        setIsLoading(true);
         try {
-            // Misafir modu ayarını kaydet
-            setIsGuestMode(true);
-            await AsyncStorage.setItem('guestMode', 'true');
+            setIsLoading(true);
 
-            // Misafir kullanıcı bilgilerini ayarla
+            // Misafir moduna geçiş işaretini koy
+            await AsyncStorage.setItem('guestModeInProgress', 'true');
+
+            // Mevcut oturumu kapat
+            const { error: signOutError } = await supabase.auth.signOut();
+            if (signOutError) {
+                console.error('Sign out error:', signOutError);
+            }
+
+            // State'leri ayarla
             setUser(null);
             setUserName('Misafir Kullanıcı');
             setUserEmail('misafir@aiasistan.com');
             setUserAvatar(null);
-
-            // Sohbet geçmişini temizle
             setChatHistory([]);
+            setActiveSohbet(null);
+
+            // Misafir modunu aktifleştir
+            setIsGuestMode(true);
+            setGuestMessageCount(0);
+
+            // AsyncStorage'a kaydet
+            await AsyncStorage.setItem('guestMode', 'true');
+            await AsyncStorage.setItem('guestMessageCount', '0');
+
+            // GeminiService geçmişini temizle
+            if (GeminiService && typeof GeminiService.clearHistory === 'function') {
+                GeminiService.clearHistory();
+            }
+
+            console.log('Misafir modu aktifleştirildi');
+
+            // Navigation için hazır olduğunu işaretle
+            setNavigationReady(true);
+
+            // Misafir moduna geçiş işaretini kaldır
+            await AsyncStorage.removeItem('guestModeInProgress');
 
             return true;
         } catch (error) {
             console.error('Guest mode error:', error);
+            await AsyncStorage.removeItem('guestModeInProgress');
             return false;
         } finally {
             setIsLoading(false);
@@ -445,12 +606,14 @@ export const AppContextProvider = ({ children }) => {
             if (isGuestMode) {
                 setIsGuestMode(false);
                 await AsyncStorage.removeItem('guestMode');
+                await AsyncStorage.removeItem('guestMessageCount'); // Mesaj sayısını da temizle
 
                 // Misafir bilgilerini sıfırla
                 setUserName('Misafir Kullanıcı');
                 setUserEmail('misafir@aiasistan.com');
                 setUserAvatar(null);
                 setChatHistory([]);
+                setGuestMessageCount(0); // Mesaj sayısını sıfırla
 
                 return true;
             }
@@ -514,30 +677,45 @@ export const AppContextProvider = ({ children }) => {
     // Yeni sohbet ekle
     const addChat = async (chat) => {
         try {
-            // Misafir modunda sohbeti sadece yerel state'te tut, veritabanına kaydetme
+            // Misafir modunda sadece yerel state'te tut
             if (isGuestMode) {
                 setChatHistory(prev => [chat, ...prev]);
                 return chat.id;
             }
 
-            if (!user) return null;
+            if (!user || !user.id) {
+                console.error('User not found');
+                return null;
+            }
 
             // Supabase'de konuşma oluştur
-            const newConversation = await ChatService.createConversation(
-                user.id,
-                chat.baslik
-            );
+            const { data: newConversation, error } = await supabase
+                .from('conversations')
+                .insert({
+                    user_id: user.id,
+                    title: chat.baslik,
+                    created_at: new Date(),
+                    updated_at: new Date()
+                })
+                .select()
+                .single();
 
-            if (!newConversation) return null;
+            if (error) {
+                console.error('Error creating conversation:', error);
+                return null;
+            }
 
-            // Eğer sağlanmışsa, başlangıç AI karşılama mesajını ekle
+            // Başlangıç AI karşılama mesajını ekle
             if (chat.messages && chat.messages.length > 0) {
                 const greetingMessage = chat.messages[0];
-                await ChatService.addMessage(
-                    newConversation.id,
-                    greetingMessage.metin,
-                    false // AI mesajı
-                );
+                await supabase
+                    .from('messages')
+                    .insert({
+                        conversation_id: newConversation.id,
+                        content: greetingMessage.metin,
+                        is_user: false,
+                        created_at: new Date()
+                    });
             }
 
             // UI için formatla ve yerel duruma ekle
@@ -559,21 +737,28 @@ export const AppContextProvider = ({ children }) => {
         }
     };
 
-    // Sohbete mesaj ekle
     const addMessageToChat = async (chatId, message) => {
         try {
             // Misafir modunda sadece yerel state'i güncelle
             if (isGuestMode) {
                 setChatHistory(prev => prev.map(chat => {
                     if (chat.id === chatId) {
-                        return {
+                        const updatedMessages = [...(chat.messages || []), message];
+                        const updatedChat = {
                             ...chat,
                             lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
                                 hour: '2-digit',
                                 minute: '2-digit'
                             }),
-                            messages: [...(chat.messages || []), message]
+                            messages: updatedMessages
                         };
+
+                        // Aktif sohbeti de güncelle
+                        if (activeSohbet && activeSohbet.id === chatId) {
+                            setActiveSohbet(updatedChat);
+                        }
+
+                        return updatedChat;
                     }
                     return chat;
                 }));
@@ -584,7 +769,7 @@ export const AppContextProvider = ({ children }) => {
             const newMessage = await ChatService.addMessage(
                 chatId,
                 message.metin,
-                message.gonderen === 'kullanici' // is_user bayrağı
+                message.gonderen === 'kullanici'
             );
 
             if (!newMessage) return false;
@@ -592,15 +777,22 @@ export const AppContextProvider = ({ children }) => {
             // Yerel durumu güncelle
             setChatHistory(prev => prev.map(chat => {
                 if (chat.id === chatId) {
-                    // lastMessageTime güncelle
-                    return {
+                    const updatedMessages = [...(chat.messages || []), message];
+                    const updatedChat = {
                         ...chat,
                         lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
                             hour: '2-digit',
                             minute: '2-digit'
                         }),
-                        messages: [...(chat.messages || []), message]
+                        messages: updatedMessages
                     };
+
+                    // Aktif sohbeti de güncelle
+                    if (activeSohbet && activeSohbet.id === chatId) {
+                        setActiveSohbet(updatedChat);
+                    }
+
+                    return updatedChat;
                 }
                 return chat;
             }));
@@ -675,8 +867,34 @@ export const AppContextProvider = ({ children }) => {
     // AI'ya mesaj gönder
     const sendMessageToAI = async (chatId, userMessage) => {
         try {
-            // Misafir modunda Gemini doğrudan kullan ve yerel state güncelle
+            // Misafir modunda mesaj limiti kontrolü
             if (isGuestMode) {
+                // Mesaj limitini kontrol et
+                if (guestMessageCount >= 5) {
+                    Alert.alert(
+                        t('error'),
+                        'Misafir kullanıcılar 5 mesaj gönderebilir. Tam deneyim için lütfen kayıt olun.',
+                        [
+                            {
+                                text: t('register'),
+                                onPress: () => {
+                                    // Navigation'a erişilemeyebilir, bu yüzden false dönüyoruz
+                                }
+                            },
+                            {
+                                text: t('ok'),
+                                style: 'cancel'
+                            }
+                        ]
+                    );
+                    return false;
+                }
+
+                // Mesaj sayısını artır
+                const newCount = guestMessageCount + 1;
+                setGuestMessageCount(newCount);
+                await AsyncStorage.setItem('guestMessageCount', newCount.toString());
+
                 // GeminiService kullanarak AI yanıtı al
                 const aiResponse = await GeminiService.generateText(userMessage);
 
@@ -694,10 +912,10 @@ export const AppContextProvider = ({ children }) => {
                     created_at: new Date()
                 };
 
-                // Yerel state güncelle
+                // Sohbet geçmişini güncelle
                 setChatHistory(prev => prev.map(chat => {
                     if (chat.id === chatId) {
-                        return {
+                        const updatedChat = {
                             ...chat,
                             lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
                                 hour: '2-digit',
@@ -705,6 +923,13 @@ export const AppContextProvider = ({ children }) => {
                             }),
                             messages: [...(chat.messages || []), userMsg, aiMsg]
                         };
+
+                        // Aktif sohbeti de güncelle
+                        if (activeSohbet && activeSohbet.id === chatId) {
+                            setActiveSohbet(updatedChat);
+                        }
+
+                        return updatedChat;
                     }
                     return chat;
                 }));
@@ -717,7 +942,7 @@ export const AppContextProvider = ({ children }) => {
 
             if (!result) return false;
 
-            // Her iki mesajla da yerel durumu güncelle
+            // Mesajları formatla
             const userMsg = {
                 id: result.userMessage.id,
                 metin: result.userMessage.content,
@@ -732,9 +957,10 @@ export const AppContextProvider = ({ children }) => {
                 created_at: new Date(result.aiMessage.created_at)
             };
 
+            // Sohbet geçmişini güncelle
             setChatHistory(prev => prev.map(chat => {
                 if (chat.id === chatId) {
-                    return {
+                    const updatedChat = {
                         ...chat,
                         lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
                             hour: '2-digit',
@@ -742,6 +968,13 @@ export const AppContextProvider = ({ children }) => {
                         }),
                         messages: [...(chat.messages || []), userMsg, aiMsg]
                     };
+
+                    // Aktif sohbeti de güncelle
+                    if (activeSohbet && activeSohbet.id === chatId) {
+                        setActiveSohbet(updatedChat);
+                    }
+
+                    return updatedChat;
                 }
                 return chat;
             }));
@@ -760,12 +993,20 @@ export const AppContextProvider = ({ children }) => {
                 language,
                 isNotificationsEnabled,
                 user,
+                isGuestMode,
+                guestMessageCount,
                 isLoading,
                 userName,
                 userEmail,
+                isGuestMode,
+                navigationReady,
+                setNavigationReady,
                 userAvatar,
                 chatHistory,
                 isGuestMode, // Misafir modu durumunu paylaş
+                chatHistory,
+                activeSohbet,
+                setActiveSohbet,
                 getColors,
                 t,
                 login,

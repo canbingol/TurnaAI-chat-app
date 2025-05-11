@@ -21,16 +21,21 @@ import { CommonActions } from '@react-navigation/native';
 
 export default function ProfilPaneliScreen({ navigation }) {
     const {
-        isDarkMode,
+        theme,
         isNotificationsEnabled,
         userName,
         userEmail,
         userAvatar,
-        toggleDarkMode,
+        changeTheme,
         toggleNotifications,
         logout,
-        isLoading
+        isLoading,
+        getColors,
+        t
     } = useContext(AppContext);
+
+    // Tema renklerini al
+    const colors = getColors();
 
     const [avatar, setAvatar] = useState(null);
     const [fadeAnim] = useState(new Animated.Value(0));
@@ -168,24 +173,24 @@ export default function ProfilPaneliScreen({ navigation }) {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar backgroundColor="#8A2BE2" barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar backgroundColor={colors.statusBar} barStyle="light-content" />
 
             {/* Üst Navigasyon */}
-            <View style={styles.ustNavigation}>
+            <View style={[styles.ustNavigation, { backgroundColor: colors.primary }]}>
                 <TouchableOpacity
                     style={styles.menuButon}
                     onPress={() => navigation.openDrawer()}
                 >
                     <Ionicons name="menu" size={26} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={styles.baslik}>Profil</Text>
+                <Text style={styles.baslik}>{t('profile')}</Text>
                 <View style={styles.profilButon} />
             </View>
 
             {isLoading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#8A2BE2" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
                 <ScrollView showsVerticalScrollIndicator={false}>
@@ -194,6 +199,7 @@ export default function ProfilPaneliScreen({ navigation }) {
                         style={[
                             styles.profilBasligi,
                             {
+                                backgroundColor: colors.card,
                                 opacity: fadeAnim,
                                 transform: [{ translateY: slideAnim }]
                             }
@@ -206,50 +212,45 @@ export default function ProfilPaneliScreen({ navigation }) {
                                         ? { uri: avatar }
                                         : require('../assets/default-profile.png')
                                 }
-                                style={styles.profilResmi}
+                                style={[styles.profilResmi, { borderColor: colors.primary }]}
                             />
                             <TouchableOpacity
-                                style={styles.profilDuzenleButonu}
+                                style={[styles.profilDuzenleButonu, { backgroundColor: colors.primary }]}
                                 onPress={pickImage}
                             >
                                 <Ionicons name="camera" size={20} color="#FFFFFF" />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.profilAdi}>{userName}</Text>
-                        <Text style={styles.profilEposta}>{userEmail}</Text>
+                        <Text style={[styles.profilAdi, { color: colors.text }]}>{userName}</Text>
+                        <Text style={[styles.profilEposta, { color: colors.textSecondary }]}>{userEmail}</Text>
 
                         <TouchableOpacity
-                            style={styles.duzenleButon}
+                            style={[styles.duzenleButon, { backgroundColor: 'rgba(138, 43, 226, 0.15)', borderColor: colors.primary }]}
                             onPress={() => navigation.navigate('KullaniciPaneli')}
                         >
                             <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-                            <Text style={styles.duzenleButtonText}>Profili Düzenle</Text>
+                            <Text style={styles.duzenleButtonText}>{t('editProfile')}</Text>
                         </TouchableOpacity>
                     </Animated.View>
 
                     {/* Ayarlar */}
                     <View style={styles.ayarlarBolumu}>
-                        <View style={styles.ayarOgesi}>
+                        <View style={[styles.ayarOgesi, { backgroundColor: colors.card }]}>
                             <View style={styles.ayarIcerigi}>
-                                <Ionicons name="moon-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.ayarMetni}>Karanlık Mod</Text>
+                                <Ionicons name="moon-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.ayarMetni, { color: colors.text }]}>
+                                    {theme === 'dark' ? t('darkMode') : theme === 'light' ? t('lightMode') : t('turquoiseMode')}
+                                </Text>
                             </View>
-                            <Switch
-                                trackColor={{ false: "#767577", true: "#8A2BE2" }}
-                                thumbColor={isDarkMode ? "#FFFFFF" : "#f4f3f4"}
-                                ios_backgroundColor="#3e3e3e"
-                                onValueChange={toggleDarkMode}
-                                value={isDarkMode}
-                            />
                         </View>
 
-                        <View style={styles.ayarOgesi}>
+                        <View style={[styles.ayarOgesi, { backgroundColor: colors.card }]}>
                             <View style={styles.ayarIcerigi}>
-                                <Ionicons name="notifications-outline" size={24} color="#8A2BE2" />
-                                <Text style={styles.ayarMetni}>Bildirimler</Text>
+                                <Ionicons name="notifications-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.ayarMetni, { color: colors.text }]}>{t('notifications')}</Text>
                             </View>
                             <Switch
-                                trackColor={{ false: "#767577", true: "#8A2BE2" }}
+                                trackColor={{ false: "#767577", true: colors.primary }}
                                 thumbColor={isNotificationsEnabled ? "#FFFFFF" : "#f4f3f4"}
                                 ios_backgroundColor="#3e3e3e"
                                 onValueChange={toggleNotifications}
@@ -264,23 +265,25 @@ export default function ProfilPaneliScreen({ navigation }) {
                             key={index}
                             style={[
                                 styles.menuOgesi,
-                                index === profilMenusu.length - 1 && styles.lastMenuItem
+                                { backgroundColor: colors.card },
+                                index === profilMenusu.length - 1 && [styles.lastMenuItem, { borderColor: 'rgba(255, 71, 87, 0.3)' }]
                             ]}
                             onPress={menu.onPress}
                         >
                             <View style={styles.menuIcerigi}>
                                 <Ionicons name={menu.icon} size={24} color={
-                                    menu.icon === 'log-out-outline' ? '#FF4757' : '#8A2BE2'
+                                    menu.icon === 'log-out-outline' ? '#FF4757' : colors.primary
                                 } />
                                 <Text style={[
                                     styles.menuMetni,
+                                    { color: colors.text },
                                     menu.icon === 'log-out-outline' && { color: '#FF4757' }
                                 ]}>{menu.baslik}</Text>
                             </View>
                             <Ionicons
                                 name="chevron-forward"
                                 size={22}
-                                color={menu.icon === 'log-out-outline' ? '#FF4757' : '#666'}
+                                color={menu.icon === 'log-out-outline' ? '#FF4757' : colors.textSecondary}
                             />
                         </TouchableOpacity>
                     ))}
@@ -292,33 +295,33 @@ export default function ProfilPaneliScreen({ navigation }) {
                             style={styles.appLogo}
                             resizeMode="contain"
                         />
-                        <Text style={styles.appName}>Turna AI</Text>
-                        <Text style={styles.appVersion}>Sürüm 1.0.0</Text>
+                        <Text style={[styles.appName, { color: colors.primary }]}>Turna AI</Text>
+                        <Text style={[styles.appVersion, { color: colors.textSecondary }]}>{t('version')} 1.0.0</Text>
                     </View>
                 </ScrollView>
             )}
 
             {/* Alt Navigasyon */}
-            <View style={styles.altNavigasyon}>
+            <View style={[styles.altNavigasyon, { backgroundColor: colors.card }]}>
                 <TouchableOpacity
                     style={styles.altNavButon}
-                    onPress={() => navigateTo('Ana Ekran')}
+                    onPress={() => navigation.navigate('Ana Ekran')}
                 >
-                    <Ionicons name="home-outline" size={24} color="#888" />
-                    <Text style={styles.altNavMetin}>Ana Ekran</Text>
+                    <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
+                    <Text style={[styles.altNavMetin, { color: colors.textSecondary }]}>{t('home')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.altNavButon}
-                    onPress={() => navigateTo('Yardım')}
+                    onPress={() => navigation.navigate('Yardım')}
                 >
-                    <Ionicons name="help-circle-outline" size={24} color="#888" />
-                    <Text style={styles.altNavMetin}>Yardım</Text>
+                    <Ionicons name="help-circle-outline" size={24} color={colors.textSecondary} />
+                    <Text style={[styles.altNavMetin, { color: colors.textSecondary }]}>{t('help')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.altNavButon}
                 >
-                    <Ionicons name="person" size={24} color="#8A2BE2" />
-                    <Text style={[styles.altNavMetin, { color: '#8A2BE2' }]}>Profil</Text>
+                    <Ionicons name="person" size={24} color={colors.primary} />
+                    <Text style={[styles.altNavMetin, { color: colors.primary }]}>{t('profile')}</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

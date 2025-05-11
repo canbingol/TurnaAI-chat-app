@@ -41,6 +41,7 @@ function AnaEkranScreen({ navigation }) {
         theme,
         chatHistory,
         addChat,
+        guestMessageCount,
         addMessageToChat,
         deleteChat,
         sendMessageToAI,
@@ -118,9 +119,14 @@ function AnaEkranScreen({ navigation }) {
             return (
                 <View style={styles.misafirUyariContainer}>
                     <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
-                    <Text style={[styles.misafirUyariText, { color: colors.textSecondary }]}>
-                        {t('guestModeActive')}. {t('guestModeChatHistory')}
-                    </Text>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={[styles.misafirUyariText, { color: colors.textSecondary }]}>
+                            {t('guestModeActive')}. {t('guestModeChatHistory')}
+                        </Text>
+                        <Text style={[styles.misafirUyariSubText, { color: colors.textSecondary, marginTop: 4 }]}>
+                            Kalan mesaj hakkınız: {5 - guestMessageCount}
+                        </Text>
+                    </View>
                 </View>
             );
         }
@@ -534,108 +540,190 @@ function AnaEkranScreen({ navigation }) {
         }
     };
 
-    const openChat = (sohbet) => {
-        if (!sohbet) return; // Null check ekleyin
+    // AnaEkranScreen.js içindeki openChat fonksiyonunu güncelle
 
-        // Sohbetin tüm mesajlarını doğru şekilde yükle
-        if (sohbet.messages && sohbet.messages.length > 0) {
-            setSohbetMesajlari([...sohbet.messages]); // Array'i doğru şekilde kopyala
+    const openChat = (sohbet) => {
+        if (!sohbet) return;
+
+        // Sohbetin güncel halini chatHistory'den al
+        const currentChat = chatHistory.find(c => c.id === sohbet.id) || sohbet;
+
+        // Mesajları yükle
+        if (currentChat.messages && currentChat.messages.length > 0) {
+            setSohbetMesajlari([...currentChat.messages]);
         } else {
             // Eğer mesaj yoksa, başlangıç mesajını göster
             setSohbetMesajlari([
-                { id: 1, metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`, gonderen: 'ai' }
+                {
+                    id: 1,
+                    metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`,
+                    gonderen: 'ai'
+                }
             ]);
         }
 
         // Sohbeti aktif olarak ayarla
-        setActiveSohbet(sohbet);
+        setActiveSohbet(currentChat);
 
-        // GeminiService geçmişini yükle
+        // GeminiService geçmişini temizle ve yükle
         try {
-            if (GeminiService && typeof GeminiService.loadHistory === 'function') {
-                GeminiService.loadHistory();
+            if (GeminiService) {
+                GeminiService.clearHistory();
+
+                // Mevcut mesajları geçmişe ekle
+                if (currentChat.messages) {
+                    currentChat.messages.forEach(msg => {
+                        if (msg.gonderen === 'kullanici') {
+                            GeminiService.addToHistory(msg.metin, '');
+                        } else if (msg.gonderen === 'ai' && msg.id !== 1) {
+                            // İlk karşılama mesajı hariç AI mesajlarını ekle
+                            const prevUserMsg = currentChat.messages[currentChat.messages.indexOf(msg) - 1];
+                            if (prevUserMsg && prevUserMsg.gonderen === 'kullanici') {
+                                GeminiService.addToHistory(prevUserMsg.metin, msg.metin);
+                            }
+                        }
+                    });
+                }
             }
         } catch (error) {
-            console.log('GeminiService.loadHistory çağrısında hata:', error);
+            console.log('GeminiService history yükleme hatası:', error);
         }
     };
 
     const mesajGonder = async () => {
-        // 0) Boş mesaj gönderme
         if (!mevcutMesaj.trim()) return;
+
+        // Misafir modu mesaj limiti kontrolü
+        if (isGuestMode && guestMessageCount >= 5) {
+            Alert.alert(
+                t('error'),
+                'Misafir kullanıcılar 5 mesaj gönderebilir. Tam deneyim için lütfen kayıt olun.',
+                [
+                    {
+                        text: t('register'),
+                        onPress: () => navigation.navigate('Kayit')
+                    },
+                    {
+                        text: t('ok'),
+                        style: 'cancel'
+                    }
+                ]
+            );
+            return;
+        }
 
         Keyboard.dismiss();
         setIsLoading(true);
 
-        // 1) Kullanıcı mesajı nesnesi
-        const userMsg = {
-            id: Date.now(),
-            metin: mevcutMesaj.trim(),
-            gonderen: 'kullanici',
-        };
-        setMevcutMesaj('');                       // input'u temizle
+        // Kullanıcı mesajını sakla
+        const userMessageText = mevcutMesaj.trim();
+        setMevcutMesaj(''); // Input'u hemen temizle
 
         try {
-            // 2) Aktif sohbet VAR mı YOK mu?
-            let chat = activeSohbet;
+            let currentChat = activeSohbet;
+            let shouldCreateNewChat = false;
 
-            if (!chat) {
-                // • İlk mesaj → yeni sohbet oluştur
-                chat = {
+            // Eğer aktif sohbet yoksa, yeni sohbet oluştur
+            if (!currentChat) {
+                shouldCreateNewChat = true;
+                currentChat = {
                     id: Date.now(),
-                    baslik: userMsg.metin.length > 25
-                        ? userMsg.metin.slice(0, 22) + '...'
-                        : userMsg.metin,
-                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                    baslik: userMessageText.length > 25
+                        ? userMessageText.slice(0, 22) + '...'
+                        : userMessageText,
+                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }),
+                    messages: []
+                };
+            }
+
+            // Kullanıcı mesajını oluştur
+            const userMsg = {
+                id: Date.now(),
+                metin: userMessageText,
+                gonderen: 'kullanici',
+            };
+
+            // Mesajları lokal olarak güncelle
+            const updatedMessages = [...(currentChat.messages || []), userMsg];
+            setSohbetMesajlari(updatedMessages);
+
+            if (shouldCreateNewChat) {
+                // Yeni sohbet oluştur
+                const chatWithGreeting = {
+                    ...currentChat,
                     messages: [
                         {
                             id: 1,
                             metin: `Merhaba ${userName || 'Misafir Kullanıcı'}! Size nasıl yardımcı olabilirim?`,
                             gonderen: 'ai',
                         },
-                        userMsg,
-                    ],
+                        userMsg
+                    ]
                 };
 
-                await addChat(chat);              // context'e kaydet
-                setActiveSohbet(chat);            // UI'de seç
-                setSohbetMesajlari(chat.messages);
-            } else {
-                // • Mevcut sohbete ekle
-                await addMessageToChat(chat.id, userMsg);
+                // Context'e kaydet
+                const newChatId = await addChat(chatWithGreeting);
 
-                // UI senkronu
-                setSohbetMesajlari(prev => [...prev, userMsg]);
-                setActiveSohbet(prev => ({
-                    ...prev,
-                    lastMessageTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-                    messages: [...prev.messages, userMsg],
+                if (newChatId) {
+                    chatWithGreeting.id = newChatId;
+                    setActiveSohbet(chatWithGreeting);
+                    setSohbetMesajlari(chatWithGreeting.messages);
+                }
+            } else {
+                // Mevcut sohbeti güncelle
+                if (!isGuestMode) {
+                    await addMessageToChat(currentChat.id, userMsg);
+                }
+            }
+
+            // AI yanıtını al
+            const response = await GeminiService.generateText(userMessageText);
+
+            // AI mesajını oluştur
+            const aiMsg = {
+                id: Date.now() + 1,
+                metin: response,
+                gonderen: 'ai',
+            };
+
+            // AI mesajını ekle
+            const finalMessages = [...updatedMessages, aiMsg];
+            setSohbetMesajlari(finalMessages);
+
+            // Context'i güncelle
+            if (!isGuestMode) {
+                await addMessageToChat(currentChat.id, aiMsg);
+            } else {
+                // Misafir modunda sadece local state'i güncelle
+                setChatHistory(prev => prev.map(chat => {
+                    if (chat.id === currentChat.id) {
+                        return {
+                            ...chat,
+                            messages: finalMessages,
+                            lastMessageTime: new Date().toLocaleTimeString('tr-TR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })
+                        };
+                    }
+                    return chat;
                 }));
             }
 
-            // 3) Gemini API → AI yanıtı
-            // Misafir modunda veya normal modda sendMessageToAI kullanılacak
-            // AppContext bu durumu otomatik olarak yönetecek
-            const success = await sendMessageToAI(chat.id, userMsg.metin);
-
-            if (!success) {
-                throw new Error('AI yanıtı alınamadı');
-            }
-        }
-        catch (err) {
-            console.error('mesajGonder hatası:', err);
+        } catch (error) {
+            console.error('Mesaj gönderme hatası:', error);
 
             const errorMsg = {
                 id: Date.now() + 2,
                 metin: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.',
                 gonderen: 'ai',
             };
-            if (activeSohbet) {
-                await addMessageToChat(activeSohbet.id, errorMsg);
-            }
+
             setSohbetMesajlari(prev => [...prev, errorMsg]);
-        }
-        finally {
+        } finally {
             setIsLoading(false);
         }
     };
@@ -1572,6 +1660,10 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    misafirUyariSubText: {
+        fontSize: 12,
+        fontWeight: '600'
     },
 });
 

@@ -237,6 +237,7 @@ export default function YardimPaneliScreen({ navigation }) {
                 name: 'Main',
             })
         );
+        navigation.navigate('Ana Ekran');
     };
 
     const goToProfile = () => {

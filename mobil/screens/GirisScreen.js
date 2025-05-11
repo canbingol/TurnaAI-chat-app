@@ -1,4 +1,6 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
+import { CommonActions } from '@react-navigation/native';
+
 import {
     View,
     Text,
@@ -19,16 +21,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { showInfoAlert, showErrorAlert } from '../utils/AlertManager';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const { width, height } = Dimensions.get('window');
 
 export default function GirisScreen({ navigation }) {
-    const { login, continueAsGuest, isLoading, getColors, t } = useContext(AppContext);
+    const { login, continueAsGuest, isLoading: contextLoading, getColors, t } = useContext(AppContext);
     const colors = getColors();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Animasyon değerleri
     const logoAnim = useRef(new Animated.Value(0)).current;
@@ -86,7 +89,7 @@ export default function GirisScreen({ navigation }) {
         };
     }, []);
 
-    // Input validasyonu
+    // Input validasyon state'leri
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
 
@@ -96,10 +99,10 @@ export default function GirisScreen({ navigation }) {
 
         // Email kontrolü
         if (!email.trim()) {
-            setEmailError(t('emailRequired'));
+            setEmailError(t('emailRequired') || 'E-posta gerekli');
             isValid = false;
         } else if (!/^\S+@\S+\.\S+$/.test(email)) {
-            setEmailError(t('invalidEmail'));
+            setEmailError(t('invalidEmail') || 'Geçersiz e-posta');
             isValid = false;
         } else {
             setEmailError('');
@@ -107,7 +110,7 @@ export default function GirisScreen({ navigation }) {
 
         // Şifre kontrolü
         if (!password) {
-            setPasswordError(t('passwordRequired'));
+            setPasswordError(t('passwordRequired') || 'Şifre gerekli');
             isValid = false;
         } else {
             setPasswordError('');
@@ -116,37 +119,77 @@ export default function GirisScreen({ navigation }) {
         if (!isValid) return;
 
         Keyboard.dismiss();
+        setIsLoading(true);
+
+        setIsLoading(true);
 
         try {
             console.log('Giriş denemesi başlatılıyor...');
+
+            // Önce misafir modunu temizle
+            await AsyncStorage.removeItem('guestMode');
+            await AsyncStorage.removeItem('guestMessageCount');
+
             // Supabase ile giriş işlemi
             const success = await login(email, password);
 
             if (success) {
                 // Başarılı giriş
-                navigation.replace('Main');
+                setTimeout(() => {
+                    navigation.dispatch(
+                        CommonActions.reset({
+                            index: 0,
+                            routes: [
+                                { name: 'Main' },
+                            ],
+                        })
+                    );
+                }, 200);
             }
-            // Başarısız durumda login fonksiyonu içinde hata mesajı gösterilecek
         } catch (error) {
             console.error('Giriş işlemi hatası:', error);
             showErrorAlert('Giriş sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    // Misafir girişi işlemi
     const handleMisafirGirisi = async () => {
         try {
+            setIsLoading(true);
+
+            // Önce AsyncStorage'ı temizle
+            await Promise.all([
+                AsyncStorage.removeItem('guestMode'),
+                AsyncStorage.removeItem('guestMessageCount')
+            ]);
+
             // Misafir girişini AppContext'teki fonksiyon ile yap
-            await continueAsGuest();
+            const success = await continueAsGuest();
 
-            // Kullanıcıya bilgi ver
-            showInfoAlert('Misafir olarak devam ediyorsunuz. Sohbet geçmişiniz kaydedilmeyecek.');
+            if (success) {
+                console.log('Misafir girişi başarılı, yönlendiriliyor...');
 
-            // Ana ekrana yönlendir
-            navigation.replace('Main');
+                // CommonActions ile kesin yönlendirme
+                setTimeout(() => {
+                    console.log('Ana ekrana yönlendiriliyor...');
+                    navigation.dispatch(
+                        CommonActions.reset({
+                            index: 0,
+                            routes: [
+                                { name: 'Main' },
+                            ],
+                        })
+                    );
+                }, 200);
+            } else {
+                showErrorAlert('Misafir girişi sırasında bir hata oluştu.');
+            }
         } catch (error) {
             console.error('Misafir girişi hatası:', error);
             showErrorAlert('Misafir girişi sırasında bir hata oluştu.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -166,6 +209,9 @@ export default function GirisScreen({ navigation }) {
             useNativeDriver: true
         }).start();
     };
+
+    // Loading durumunu kontrol et
+    const isLoadingAny = isLoading || contextLoading;
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -287,11 +333,11 @@ export default function GirisScreen({ navigation }) {
                         <TouchableOpacity
                             style={[styles.loginButton, { backgroundColor: colors.primary }]}
                             onPress={handleLogin}
-                            disabled={isLoading}
+                            disabled={isLoadingAny}
                             onPressIn={onPressIn}
                             onPressOut={onPressOut}
                         >
-                            {isLoading ? (
+                            {isLoadingAny ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <Text style={styles.loginButtonText}>{t('login')}</Text>
@@ -302,8 +348,13 @@ export default function GirisScreen({ navigation }) {
                     <TouchableOpacity
                         style={[styles.misafirButton, { backgroundColor: colors.card, borderColor: colors.border }]}
                         onPress={handleMisafirGirisi}
+                        disabled={isLoadingAny}
                     >
-                        <Text style={[styles.misafirButtonText, { color: colors.primary }]}>{t('continueAsGuest')}</Text>
+                        {isLoadingAny ? (
+                            <ActivityIndicator color={colors.primary} size="small" />
+                        ) : (
+                            <Text style={[styles.misafirButtonText, { color: colors.primary }]}>{t('continueAsGuest')}</Text>
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.registerContainer}>

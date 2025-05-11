@@ -14,9 +14,13 @@ import {
     Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../services/supabaseConfig'; // Doğrudan supabase'i içe aktarıyoruz
+import { supabase } from '../services/supabaseConfig';
+import { AppContext } from '../context/AppContext';
 
 export default function KayitScreen({ navigation }) {
+    const { getColors, t } = useContext(AppContext);
+    const colors = getColors();
+
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -172,8 +176,8 @@ export default function KayitScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar backgroundColor="#8A2BE2" barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar backgroundColor={colors.statusBar} barStyle="light-content" />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.logoContainer}>
@@ -182,16 +186,16 @@ export default function KayitScreen({ navigation }) {
                         style={styles.logo}
                         resizeMode="contain"
                     />
-                    <Text style={styles.title}>Turna AI</Text>
+                    <Text style={[styles.title, { color: colors.primary }]}>Turna AI</Text>
                 </View>
 
                 <View style={styles.formContainer}>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="person-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="person-outline" size={24} color={colors.primary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
-                            placeholder="Ad Soyad"
-                            placeholderTextColor="#888"
+                            style={[styles.input, { color: colors.text }]}
+                            placeholder={t('name')}
+                            placeholderTextColor={colors.textSecondary}
                             value={name}
                             onChangeText={(text) => {
                                 setName(text);
@@ -201,12 +205,12 @@ export default function KayitScreen({ navigation }) {
                     </View>
                     {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
 
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="mail-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="mail-outline" size={24} color={colors.primary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
-                            placeholder="E-posta"
-                            placeholderTextColor="#888"
+                            style={[styles.input, { color: colors.text }]}
+                            placeholder={t('email')}
+                            placeholderTextColor={colors.textSecondary}
                             value={email}
                             onChangeText={(text) => {
                                 setEmail(text);
@@ -218,12 +222,12 @@ export default function KayitScreen({ navigation }) {
                     </View>
                     {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="lock-closed-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="lock-closed-outline" size={24} color={colors.primary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
-                            placeholder="Şifre"
-                            placeholderTextColor="#888"
+                            style={[styles.input, { color: colors.text }]}
+                            placeholder={t('password')}
+                            placeholderTextColor={colors.textSecondary}
                             value={password}
                             onChangeText={(text) => {
                                 setPassword(text);
@@ -238,18 +242,18 @@ export default function KayitScreen({ navigation }) {
                             <Ionicons
                                 name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#888"
+                                color={colors.textSecondary}
                             />
                         </TouchableOpacity>
                     </View>
                     {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="lock-closed-outline" size={24} color="#8A2BE2" style={styles.inputIcon} />
+                    <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="lock-closed-outline" size={24} color={colors.primary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
-                            placeholder="Şifre Tekrar"
-                            placeholderTextColor="#888"
+                            style={[styles.input, { color: colors.text }]}
+                            placeholder={t('confirmPassword')}
+                            placeholderTextColor={colors.textSecondary}
                             value={confirmPassword}
                             onChangeText={(text) => {
                                 setConfirmPassword(text);
@@ -264,28 +268,28 @@ export default function KayitScreen({ navigation }) {
                             <Ionicons
                                 name={isConfirmPasswordVisible ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#888"
+                                color={colors.textSecondary}
                             />
                         </TouchableOpacity>
                     </View>
                     {confirmPasswordError ? <Text style={styles.errorText}>{confirmPasswordError}</Text> : null}
 
                     <TouchableOpacity
-                        style={styles.kayitButton}
+                        style={[styles.kayitButton, { backgroundColor: colors.primary }]}
                         onPress={handleKayitOl}
                         disabled={isLoading}
                     >
                         {isLoading ? (
                             <ActivityIndicator color="#FFFFFF" size="small" />
                         ) : (
-                            <Text style={styles.kayitButtonText}>Kayıt Ol</Text>
+                            <Text style={styles.kayitButtonText}>{t('register')}</Text>
                         )}
                     </TouchableOpacity>
 
                     <View style={styles.loginContainer}>
-                        <Text style={styles.loginText}>Zaten hesabın var mı?</Text>
+                        <Text style={[styles.loginText, { color: colors.textSecondary }]}>{t('haveAccount')}</Text>
                         <TouchableOpacity onPress={() => navigation.goBack()}>
-                            <Text style={styles.loginLink}>Giriş Yap</Text>
+                            <Text style={[styles.loginLink, { color: colors.primary }]}>{t('login')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -293,6 +297,7 @@ export default function KayitScreen({ navigation }) {
         </SafeAreaView>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {
