@@ -1889,7 +1889,100 @@ body.font-large .suggestion-chip {
     min-width: 0;
     transition: all 0.3s ease;
 }
+/* Model Seçimi Stilleri */
+.model-selector {
+    padding: 16px;
+    border-bottom: 1px solid var(--light-gray);
+    margin-bottom: 16px;
+}
 
+.model-selector .mode-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.model-options {
+    display: flex;
+    gap: 8px;
+}
+
+.model-btn {
+    flex: 1;
+    background-color: var(--medium-gray);
+    color: var(--text-muted);
+    border: 1px solid var(--light-gray);
+    border-radius: 6px;
+    padding: 8px 0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.model-btn i {
+    font-size: 14px;
+}
+
+.model-btn:hover {
+    background-color: var(--light-gray);
+}
+
+.model-btn.active {
+    background-color: rgba(156, 39, 176, 0.2);
+    color: var(--primary-purple);
+    border-color: var(--primary-purple);
+}
+
+/* Chat Modları stillerini güncelle - hem model hem mod seçimi için ortak stiller */
+.chat-modes, .model-selector {
+    padding: 16px;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.chat-modes .mode-label, .model-selector .mode-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.mode-options, .model-options {
+    display: flex;
+    gap: 8px;
+}
+
+.mode-btn, .model-btn {
+    flex: 1;
+    background-color: var(--medium-gray);
+    color: var(--text-muted);
+    border: 1px solid var(--light-gray);
+    border-radius: 6px;
+    padding: 8px 0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.mode-btn i, .model-btn i {
+    font-size: 14px;
+}
+
+.mode-btn:hover, .model-btn:hover {
+    background-color: var(--light-gray);
+}
+
+.mode-btn.active, .model-btn.active {
+    background-color: rgba(156, 39, 176, 0.2);
+    color: var(--primary-purple);
+    border-color: var(--primary-purple);
+}
 /* Kapalıyken içerikleri gizle */
 .sidebar-toggle-checkbox:checked ~ .sidebar * {
     opacity: 0;

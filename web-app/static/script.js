@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const menuToggle = document.querySelector('.menu-toggle');
     const sidebar = document.querySelector('.sidebar');
     const modeBtns = document.querySelectorAll('.mode-btn');
+    const modelBtns = document.querySelectorAll('.model-btn');
     const attachBtn = document.getElementById('attach-btn');
     const fileModal = document.getElementById('file-modal');
     const closeModals = document.querySelectorAll('.close-modal');
@@ -30,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentTheme = 'purple';
     let darkMode = true;
     let currentMode = 'normal';
+    let currentModel = 'turnaV1'; // Varsayılan model
     let isRecording = false;
     let isAuthenticated = false;
     let currentUser = null;
@@ -80,6 +82,26 @@ document.addEventListener('DOMContentLoaded', function () {
             toast.remove();
         }, 3000);
     }
+
+    // Model seçimi için event listener'lar
+    modelBtns.forEach(button => {
+        button.addEventListener('click', function () {
+            // Aktif sınıfını kaldır
+            modelBtns.forEach(btn => btn.classList.remove('active'));
+
+            // Tıklanan butona aktif sınıfı ekle
+            this.classList.add('active');
+
+            // Seçilen modeli güncelle
+            currentModel = this.getAttribute('data-model');
+
+            // Toast bildirimi göster
+            const modelName = currentModel === 'turnaV1' ? 'TurnaV1' : 'Gemini';
+            showToast(`Model "${modelName}" olarak değiştirildi`, 'info');
+
+            console.log('Seçilen model:', currentModel);
+        });
+    });
 
     // Kullanıcı kimlik doğrulama durumunu kontrol et
     async function checkAuthStatus() {
@@ -808,6 +830,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const capability2Msg = window.t ? window.t('capability2') : 'Yaratıcı içerik oluşturabilirim';
         const capability3Msg = window.t ? window.t('capability3') : 'Metinleri düzenleyebilirim';
         const capability4Msg = window.t ? window.t('capability4') : 'Kodlama yardımı sunabilirim';
+        // resetChatArea devamı
         const copyMsg = window.t ? window.t('copy') : 'Kopyala';
         const likeMsg = window.t ? window.t('like') : 'Beğen';
         const dislikeMsg = window.t ? window.t('dislike') : 'Beğenme';
@@ -1149,7 +1172,8 @@ document.addEventListener('DOMContentLoaded', function () {
             let endpoint = '/api/generate';
             let requestBody = {
                 prompt: message,
-                mode: currentMode
+                mode: currentMode,
+                model: currentModel // Model parametresini ekle
             };
 
             // Eğer kullanıcı giriş yapmışsa ve bir sohbet kimliği varsa
@@ -1570,4 +1594,3 @@ window.showToast = function (message, type = 'info') {
 };
 
 window.sendMessage = sendMessage;
-
