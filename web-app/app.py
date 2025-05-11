@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from google import genai
 from supabase import create_client, Client
 import re
+from inferance import inferance  # TurnaV1 modelini import et
 
 # Çevre değişkenlerini yükle
 load_dotenv()
@@ -265,6 +266,7 @@ def create_message():
         user_input = data.get('prompt', '')
         conversation_id = data.get('conversation_id', '')
         mode = data.get('mode', 'normal')  # Kullanım modu (normal, yaratıcı, kesin)
+        model = data.get('model', 'turnaV1')  # Model seçimi (turnaV1 veya gemini)
         
         # Sohbetin kullanıcıya ait olduğunu kontrol et
         check = supabase.table('conversations').select('id').eq('id', conversation_id).eq('user_id', session['user_id']).execute()
@@ -281,24 +283,43 @@ def create_message():
         
         supabase.table('messages').insert(user_message).execute()
         
-        # Gemini API'ye istek gönder
-        client = genai.Client(api_key=api_key)
-        
-        # Seçilen moda göre ayarlar
-        if mode == 'creative':
-            temperature = 0.8
-        elif mode == 'precise':
-            temperature = 0.2
-        else:  # normal
-            temperature = 0.5
+        # Seçilen modele göre yanıt üret
+        if model == 'turnaV1':
+            # TurnaV1 modelini kullan
+            try:
+                # Mode'a göre token sayısını ayarla
+                if mode == 'creative':
+                    max_tokens = 200
+                elif mode == 'precise':
+                    max_tokens = 50
+                else:  # normal
+                    max_tokens = 100
+                
+                # TurnaV1 modelinden yanıt al
+                ai_response = inferance(user_input, max_new_token=max_tokens)
+                
+            except Exception as e:
+                print(f"TurnaV1 model error: {e}")
+                ai_response = "Üzgünüm, şu anda TurnaV1 modeli ile yanıt oluşturamıyorum. Lütfen daha sonra tekrar deneyin."
+        else:
+            # Gemini modelini kullan
+            client = genai.Client(api_key=api_key)
             
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=user_input,
-            config={"temperature": temperature}
-        )
-        
-        ai_response = response.text
+            # Seçilen moda göre ayarlar
+            if mode == 'creative':
+                temperature = 0.8
+            elif mode == 'precise':
+                temperature = 0.2
+            else:  # normal
+                temperature = 0.5
+                
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=user_input,
+                config={"temperature": temperature}
+            )
+            
+            ai_response = response.text
         
         # Yapay zeka yanıtını veritabanına kaydet
         ai_message = {
@@ -369,25 +390,47 @@ def generate():
         data = request.json
         user_input = data.get('prompt', 'Explain how AI works')
         mode = data.get('mode', 'normal')
+        model = data.get('model', 'turnaV1')  # Model seçimi
         
-        # Gemini API'ye istek gönder
-        client = genai.Client(api_key=api_key)
-        
-        # Seçilen moda göre ayarlar
-        if mode == 'creative':
-            temperature = 0.8
-        elif mode == 'precise':
-            temperature = 0.2
-        else:  # normal
-            temperature = 0.5
+        # Seçilen modele göre yanıt üret
+        if model == 'turnaV1':
+            # TurnaV1 modelini kullan
+            try:
+                # Mode'a göre token sayısını ayarla
+                if mode == 'creative':
+                    max_tokens = 200
+                elif mode == 'precise':
+                    max_tokens = 50
+                else:  # normal
+                    max_tokens = 100
+                
+                # TurnaV1 modelinden yanıt al
+                response_text = inferance(user_input, max_new_token=max_tokens)
+                
+            except Exception as e:
+                print(f"TurnaV1 model error: {e}")
+                response_text = "Üzgünüm, şu anda TurnaV1 modeli ile yanıt oluşturamıyorum. Lütfen daha sonra tekrar deneyin."
+        else:
+            # Gemini modelini kullan
+            client = genai.Client(api_key=api_key)
             
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=user_input,
-            config={"temperature": temperature}
-        )
+            # Seçilen moda göre ayarlar
+            if mode == 'creative':
+                temperature = 0.8
+            elif mode == 'precise':
+                temperature = 0.2
+            else:  # normal
+                temperature = 0.5
+                
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=user_input,
+                config={"temperature": temperature}
+            )
+            
+            response_text = response.text
         
-        return jsonify({'response': response.text})
+        return jsonify({'response': response_text})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

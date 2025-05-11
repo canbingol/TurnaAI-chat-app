@@ -29,7 +29,8 @@ body {
     background-color: var(--black);
     color: var(--text-light);
     height: 100vh;
-    overflow: hidden;
+    margin: 0;
+    padding: 0;
 }
 
 /* Ana Uygulama Konteyneri */
@@ -38,6 +39,7 @@ body {
     height: 100vh;
     width: 100vw;
     position: relative;
+    overflow: hidden;
 }
 
 /* Sidebar Stili */
@@ -210,12 +212,16 @@ body {
     flex-direction: column;
     background-color: var(--dark-gray);
     position: relative;
+    overflow: hidden;
 }
+
 
 #chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
+    scroll-behavior: smooth;
 }
 
 .message {
@@ -1793,31 +1799,241 @@ body.font-large .suggestion-chip {
     display: none;
     justify-content: center;
     align-items: center;
-    z-index: 2000;
-    opacity: 0;
-    transition: opacity 0.3s;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
 }
-
-.profile-card-overlay.show {
+.profile-card-overlay.visible {
     display: flex;
     opacity: 1;
 }
+/* Show class'ı eklendiğinde görünür yap */
+.profile-card-overlay.show {
+    display: flex !important; /* !important ekleyin */
+    opacity: 1 !important;
+}
+/* Gizli checkbox */
+.sidebar-toggle-checkbox {
+    display: none;
+}
 
+/* App container'a relative position ekle */
+.app-container {
+    position: relative;
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar toggle butonu */
+.sidebar-toggle {
+    position: fixed; /* Absolute yerine fixed */
+    left: 280px; /* Sidebar genişliği kadar soldan */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    background-color: var(--primary-purple);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-toggle:hover {
+    background-color: var(--light-purple);
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Sidebar varsayılan durumu */
+.sidebar {
+    width: 280px;
+    height: 100%;
+    background-color: var(--dark-gray);
+    border-right: 1px solid var(--light-gray);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+/* Checkbox işaretlendiğinde sidebar'ı gizle */
+.sidebar-toggle-checkbox:checked ~ .sidebar {
+    width: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+/* Toggle butonu konumu - sidebar kapalıyken */
+.sidebar-toggle-checkbox:checked ~ .sidebar-toggle {
+    left: 0;
+}
+
+/* Toggle icon'unu döndür */
+.sidebar-toggle i {
+    transition: transform 0.3s ease;
+}
+
+.sidebar-toggle-checkbox:checked ~ .sidebar-toggle i {
+    transform: rotate(180deg);
+}
+
+/* Ana içerik */
+.main-content {
+    flex: 1;
+    min-width: 0;
+    transition: all 0.3s ease;
+}
+/* Model Seçimi Stilleri */
+.model-selector {
+    padding: 16px;
+    border-bottom: 1px solid var(--light-gray);
+    margin-bottom: 16px;
+}
+
+.model-selector .mode-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.model-options {
+    display: flex;
+    gap: 8px;
+}
+
+.model-btn {
+    flex: 1;
+    background-color: var(--medium-gray);
+    color: var(--text-muted);
+    border: 1px solid var(--light-gray);
+    border-radius: 6px;
+    padding: 8px 0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.model-btn i {
+    font-size: 14px;
+}
+
+.model-btn:hover {
+    background-color: var(--light-gray);
+}
+
+.model-btn.active {
+    background-color: rgba(156, 39, 176, 0.2);
+    color: var(--primary-purple);
+    border-color: var(--primary-purple);
+}
+
+/* Chat Modları stillerini güncelle - hem model hem mod seçimi için ortak stiller */
+.chat-modes, .model-selector {
+    padding: 16px;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.chat-modes .mode-label, .model-selector .mode-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.mode-options, .model-options {
+    display: flex;
+    gap: 8px;
+}
+
+.mode-btn, .model-btn {
+    flex: 1;
+    background-color: var(--medium-gray);
+    color: var(--text-muted);
+    border: 1px solid var(--light-gray);
+    border-radius: 6px;
+    padding: 8px 0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.mode-btn i, .model-btn i {
+    font-size: 14px;
+}
+
+.mode-btn:hover, .model-btn:hover {
+    background-color: var(--light-gray);
+}
+
+.mode-btn.active, .model-btn.active {
+    background-color: rgba(156, 39, 176, 0.2);
+    color: var(--primary-purple);
+    border-color: var(--primary-purple);
+}
+/* Kapalıyken içerikleri gizle */
+.sidebar-toggle-checkbox:checked ~ .sidebar * {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+/* Mobil görünüm için */
+@media (max-width: 768px) {
+    .sidebar-toggle {
+        display: none;
+    }
+    
+    .sidebar {
+        position: fixed;
+        left: 0;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .main-content {
+        width: 100%;
+    }
+}
+/* Profile Card stilini düzeltin */
 .profile-card {
+    display: none;
+    position: relative;
     background-color: var(--dark-gray);
     width: 90%;
     max-width: 500px;
     border-radius: 12px;
-    box-shadow: 0 5px 30px var(--shadow-color);
     overflow: hidden;
-    display: none;
-    transform: translateY(20px);
-    transition: transform 0.3s;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    max-height: 90vh;
+    overflow-y: auto;
 }
-
-.profile-card.show {
+.profile-card.visible {
     display: block;
-    transform: translateY(0);
+    opacity: 1;
+}
+.profile-card.show {
+    display: block !important; /* !important ekleyin */
+    transform: translateY(0) !important;
+    opacity: 1 !important;
 }
 
 .profile-card-header {
@@ -2264,4 +2480,44 @@ body.font-large .suggestion-chip {
 .social-link:hover {
     background-color: var(--primary-purple);
     color: white;
+}
+/* Profile Card Overlay stilini düzeltin */
+.profile-card-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none; /* Başlangıçta gizli */
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Show class'ı eklendiğinde görünür yap */
+.profile-card-overlay.show {
+    display: flex;
+    opacity: 1;
+}
+
+/* Profile Card stilini düzeltin */
+.profile-card {
+    display: none;
+    position: relative;
+    background-color: var(--dark-gray);
+    max-width: 500px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    z-index: 2001;
+  }
+
+/* Show class'ı eklendiğinde görünür yap */
+.profile-card.show {
+    display: block;
+    transform: translateY(0);
+    opacity: 1;
 }

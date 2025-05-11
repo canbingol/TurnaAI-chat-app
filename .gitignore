@@ -15,3 +15,6 @@ env/
 
 # Derlenmiş statik dosyalar
 static/dist/
+# Model
+AI-Model/turna-ds-finetued.pt
+
