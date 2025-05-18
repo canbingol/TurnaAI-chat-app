@@ -142,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function () {
         authModal.classList.remove('show');
     }
 
-
     function showProfileCard(cardId) {
         console.log('showProfileCard çağrıldı:', cardId);
 
@@ -390,7 +389,18 @@ document.addEventListener('DOMContentLoaded', function () {
     if (guestLoginBtn) {
         guestLoginBtn.addEventListener('click', function () {
             hideAuthModal();
-            showToast('Misafir olarak giriş yapıldı', 'info');
+            
+            // Misafir modu için session storage'a değerleri ayarla
+            sessionStorage.setItem('isGuestMode', 'true');
+            sessionStorage.setItem('guestRemainingMessages', '5');
+            
+            // Misafir olarak giriş mesajını göster
+            showToast('Misafir olarak giriş yapıldı (5 mesaj hakkınız var)', 'info');
+            
+            // Sayfayı yenile
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         });
     }
 
@@ -398,6 +408,20 @@ document.addEventListener('DOMContentLoaded', function () {
     if (logoutLink) {
         logoutLink.addEventListener('click', async function (e) {
             e.preventDefault();
+            
+            // Misafir modu kontrolü
+            if (sessionStorage.getItem('isGuestMode') === 'true') {
+                // Misafir modunda "Çıkış Yap" butonuna tıklanırsa, login sayfasına yönlendir
+                sessionStorage.removeItem('isGuestMode');
+                sessionStorage.removeItem('guestRemainingMessages');
+                showToast('Giriş sayfasına yönlendiriliyorsunuz', 'info');
+                
+                // Auth modalını göster
+                setTimeout(() => {
+                    showAuthModal();
+                }, 1000);
+                return;
+            }
 
             try {
                 const response = await fetch('/api/logout', {
@@ -425,6 +449,82 @@ document.addEventListener('DOMContentLoaded', function () {
     // Kullanıcı kimlik doğrulama durumunu kontrol et
     async function checkAuthStatus() {
         try {
+            // Misafir modu kontrolü
+            if (sessionStorage.getItem('isGuestMode') === 'true') {
+                console.log('Misafir modu aktif');
+                // Logout butonunu 'Giriş Yap' olarak güncelle
+                const logoutLink = document.getElementById('logout-link');
+                if (logoutLink) {
+                    const logoutText = logoutLink.querySelector('span');
+                    if (logoutText) {
+                        logoutText.textContent = 'Giriş Yap';
+                    }
+                }
+                // Profil, Geçmiş, Tercihler butonlarını devre dışı bırak
+                ['profile-link', 'history-link', 'preferences-link'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.classList.add('disabled');
+                        el.style.pointerEvents = 'none';
+                        el.style.opacity = '0.5';
+                    }
+                });
+                // Yardım ve Giriş Yap aktif kalsın
+                const helpLink = document.getElementById('help-link');
+                if (helpLink) {
+                    helpLink.classList.remove('disabled');
+                    helpLink.style.pointerEvents = '';
+                    helpLink.style.opacity = '';
+                }
+                if (logoutLink) {
+                    logoutLink.classList.remove('disabled');
+                    logoutLink.style.pointerEvents = '';
+                    logoutLink.style.opacity = '';
+                }
+                // Başlık çubuğuna kalan mesaj sayısını ekle
+                if (typeof window.updateRemainingMessagesDisplay === 'function') {
+                    window.updateRemainingMessagesDisplay();
+                } else {
+                    updateRemainingMessagesDisplay();
+                }
+                // Yeni Sohbet butonunu devre dışı bırak
+                const newChatBtn = document.querySelector('.new-chat-btn');
+                if (newChatBtn) {
+                    newChatBtn.classList.add('disabled');
+                    newChatBtn.disabled = true;
+                    newChatBtn.style.pointerEvents = 'none';
+                    newChatBtn.style.opacity = '0.5';
+                }
+                // Ayarlar butonunu devre dışı bırak
+                const settingsBtn = document.querySelector('.settings-btn');
+                if (settingsBtn) {
+                    settingsBtn.classList.add('disabled');
+                    settingsBtn.disabled = true;
+                    settingsBtn.style.pointerEvents = 'none';
+                    settingsBtn.style.opacity = '0.5';
+                }
+                // Çöp kutusu (temizle) butonunu devre dışı bırak
+                const clearBtn = document.getElementById('clear-btn');
+                if (clearBtn) {
+                    clearBtn.classList.add('disabled');
+                    clearBtn.disabled = true;
+                    clearBtn.style.pointerEvents = 'none';
+                    clearBtn.style.opacity = '0.5';
+                }
+                
+                // Mikrofon ve doküman yükleme butonlarını tamamen kaldır
+                document.querySelectorAll('#mic-btn, #attach-btn').forEach(btn => {
+                    if (btn) btn.style.display = 'none';
+                });
+                
+                // Başlığı güncelle
+                if (typeof window.updateGuestConversationTitle === 'function') {
+                    window.updateGuestConversationTitle();
+                }
+                
+                return true;
+            }
+            
             const response = await fetch('/api/user');
 
             if (response.ok) {
@@ -440,6 +540,52 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Kimlik doğrulama kontrolü hatası:', error);
             return false;
+        }
+    }
+
+    // Kalan mesaj sayısını gösteren fonksiyon
+    function updateRemainingMessagesDisplay() {
+        // Eğer varsa eski mesaj sayacını kaldır
+        const existingCounter = document.getElementById('guest-message-counter');
+        if (existingCounter) {
+            existingCounter.remove();
+        }
+        
+        // Misafir modu kontrolü
+        if (sessionStorage.getItem('isGuestMode') === 'true') {
+            // Kalan mesaj sayısını al
+            const remainingMessages = sessionStorage.getItem('guestRemainingMessages') || '5';
+            
+            // Sağ üst köşeye sayacı ekle
+            const counter = document.createElement('div');
+            counter.id = 'guest-message-counter';
+            counter.className = 'guest-counter';
+            counter.innerHTML = `<i class="fas fa-comment"></i> <span>${remainingMessages}</span>`;
+            
+            // CSS ekle
+            counter.style.position = 'fixed';
+            counter.style.top = '10px';
+            counter.style.right = '80px';
+            counter.style.backgroundColor = 'var(--primary-color)';
+            counter.style.color = 'white';
+            counter.style.padding = '5px 10px';
+            counter.style.borderRadius = '20px';
+            counter.style.fontSize = '14px';
+            counter.style.zIndex = '1000';
+            
+            document.body.appendChild(counter);
+
+            // Gönder butonunu kontrol et
+            const sendButton = document.getElementById('send-button');
+            if (sendButton) {
+                if (parseInt(remainingMessages) <= 0) {
+                    sendButton.disabled = true;
+                    sendButton.title = 'Mesaj hakkınız kalmadı';
+                } else {
+                    sendButton.disabled = false;
+                    sendButton.title = 'Gönder';
+                }
+            }
         }
     }
 
@@ -484,7 +630,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Window global'e fonksiyon referanslarını ekle
-    window.showProfileCard = showProfileCard;
-    window.hideProfileCards = hideProfileCards;
+    // Yardım/İletişim formu mailto ile gönderilsin
+    const contactForm = document.querySelector('.contact-form');
+    if (contactForm) {
+        contactForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            window.location.href = 'mailto:canobingol2@gmail.com';
+        });
+    }
+
+    // Global erişim için fonksiyonları window objesine ekle
+    window.showAuthModal = showAuthModal;
+    window.updateRemainingMessagesDisplay = updateRemainingMessagesDisplay;
 });

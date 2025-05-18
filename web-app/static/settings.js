@@ -7,9 +7,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Dil Seçimi
     const languageSelect = document.getElementById('language-select');
     
-    // Otomatik Kaydırma
-    const autoScrollToggle = document.getElementById('auto-scroll-toggle');
-    
     // Yazı Boyutu
     const fontSizeSelect = document.getElementById('font-size-select');
     
@@ -18,9 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Tema Toggle Butonu
     const themeToggleBtn = document.getElementById('theme-toggle-btn');
-    
-    // Ses Bildirimleri
-    const soundNotificationToggle = document.getElementById('sound-notification-toggle');
     
     // Ayarları localStorage'dan yükle
     loadSettings();
@@ -50,39 +44,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedLang = this.value;
             saveSettings('language', selectedLang);
             
-            // window.t fonksiyonunu kontrol et ve kullan
             const langChangedMsg = window.t ? 
                 window.t('languageChanged') + ': ' + window.t(getLanguageName(selectedLang)) : 
                 `Dil "${getLanguageName(selectedLang)}" olarak değiştirildi`;
             
             showToast(langChangedMsg, 'info');
             
-            // Dil değişimini uygula
             if (window.changeLanguage) {
                 window.changeLanguage(selectedLang);
             }
-            
-            // Dil değişikliği olayını tetikle
-            document.dispatchEvent(new CustomEvent('languageChanged', {
-                detail: { language: selectedLang }
-            }));
-        });
-    }
-    
-    // Otomatik kaydırma değişimi
-    if (autoScrollToggle) {
-        autoScrollToggle.addEventListener('change', function() {
-            const isEnabled = this.checked;
-            saveSettings('autoScroll', isEnabled);
-            
-            // Çeviri için kontrol et
-            const status = isEnabled ? 
-                (window.t ? window.t('settingEnabled') : 'etkinleştirildi') : 
-                (window.t ? window.t('settingDisabled') : 'devre dışı bırakıldı');
-            
-            const autoScrollLabel = window.t ? window.t('autoScroll') : 'Otomatik kaydırma';
-            
-            showToast(`${autoScrollLabel} ${status}`, 'info');
         });
     }
     
@@ -93,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
             saveSettings('fontSize', selectedSize);
             applyFontSize(selectedSize);
             
-            // Çeviri için kontrol et
             const fontSizeChangedMsg = window.t ? 
                 window.t('fontSizeChanged') + ': ' + window.t(getFontSizeName(selectedSize)) : 
                 `Yazı boyutu "${getFontSizeName(selectedSize)}" olarak değiştirildi`;
@@ -102,52 +71,55 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Tema seçimi
+    // Tema seçimi - Tema butonlarına tıklandığında
     if (themeOptions) {
         themeOptions.forEach(option => {
             option.addEventListener('click', function() {
                 const theme = this.dataset.theme;
                 
-                // Aktif tema butonunu güncelle
-                themeOptions.forEach(opt => opt.classList.remove('active'));
-                this.classList.add('active');
+                // Turquoise temasını geç
+                if (theme === 'turquoise') {
+                    return;
+                }
                 
-                // Temayı uygula
-                applyTheme(theme);
-                saveSettings('theme', theme);
-                
-                // Tema toggle butonunu güncelle
-                updateThemeToggleButton(theme);
-                
-                // Çeviri için kontrol et
-                const themeChangedMsg = window.t ? 
-                    window.t('themeChanged') + ': ' + window.t(theme) : 
-                    `Tema "${getThemeName(theme)}" olarak değiştirildi`;
-                
-                showToast(themeChangedMsg, 'success');
+                // Global tema değiştirme fonksiyonunu çağır
+                toggleTheme(theme);
             });
         });
     }
     
-    // Ses bildirimleri değişimi
-    if (soundNotificationToggle) {
-        soundNotificationToggle.addEventListener('change', function() {
-            const isEnabled = this.checked;
-            saveSettings('soundNotifications', isEnabled);
-            
-            // Çeviri için kontrol et
-            const status = isEnabled ? 
-                (window.t ? window.t('settingEnabled') : 'etkinleştirildi') : 
-                (window.t ? window.t('settingDisabled') : 'devre dışı bırakıldı');
-            
-            const soundLabel = window.t ? window.t('soundNotifications') : 'Ses bildirimleri';
-            
-            showToast(`${soundLabel} ${status}`, 'info');
-            
-            // Test sesi çal
-            if (isEnabled && window.SoundNotifications) {
-                window.SoundNotifications.playNotificationSound();
+    // Global tema değiştirme fonksiyonu - dışa aktar
+    window.toggleTheme = function(specificTheme) {
+        // Mevcut temayı al
+        const settings = JSON.parse(localStorage.getItem('turnaSettings')) || {};
+        const currentTheme = settings.theme || 'purple';
+        
+        // Yeni tema - eğer belirli bir tema isteniyorsa onu kullan, yoksa toggle yap
+        const newTheme = specificTheme || (currentTheme === 'light' ? 'purple' : 'light');
+        
+        // Temayı uygula
+        applyTheme(newTheme);
+        saveSettings('theme', newTheme);
+        
+        // Tema seçeneklerini güncelle - tüm tema butonlarını güncelle
+        document.querySelectorAll('.theme-option').forEach(option => {
+            if (option.dataset.theme === newTheme) {
+                option.classList.add('active');
+            } else {
+                option.classList.remove('active');
             }
+        });
+        
+        // Tema butonunu güncelle
+        updateThemeToggleButton(newTheme);
+        
+        return newTheme;
+    };
+    
+    // Sidebar'daki tema toggle butonu
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', function() {
+            toggleTheme(); // Parametre vermeden çağırarak otomatik değişim sağla
         });
     }
     
@@ -171,15 +143,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (settings.language && languageSelect) {
                 languageSelect.value = settings.language;
                 
-                // Dil değişimini uygula
                 if (window.changeLanguage) {
                     window.changeLanguage(settings.language);
                 }
-            }
-            
-            // Otomatik kaydırma ayarını yükle
-            if (autoScrollToggle && settings.autoScroll !== undefined) {
-                autoScrollToggle.checked = settings.autoScroll;
             }
             
             // Yazı boyutu ayarını yükle
@@ -188,26 +154,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyFontSize(settings.fontSize);
             }
             
-            // Tema ayarını yükle
+            // Tema ayarını yükle (sadece light ve purple)
             if (settings.theme) {
-                applyTheme(settings.theme);
+                // Turquoise ise purple olarak değiştir
+                const theme = settings.theme === 'turquoise' ? 'purple' : settings.theme;
+                applyTheme(theme);
+                
+                // Tema butonlarını güncelle
                 themeOptions.forEach(option => {
-                    if (option.dataset.theme === settings.theme) {
+                    if (option.dataset.theme === theme) {
                         option.classList.add('active');
                     } else {
                         option.classList.remove('active');
                     }
                 });
                 
-                // Tema toggle butonunu güncelle
-                updateThemeToggleButton(settings.theme);
+                updateThemeToggleButton(theme);
             }
-            
-            // Ses bildirimleri ayarını yükle
-            if (soundNotificationToggle && settings.soundNotifications !== undefined) {
-                soundNotificationToggle.checked = settings.soundNotifications;
-            }
-            
         } catch (error) {
             console.error('Ayarlar yüklenemedi:', error);
         }
@@ -215,46 +178,56 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Temayı uygula
     function applyTheme(theme) {
-        // Önceki temaları temizle
-        document.body.classList.remove('theme-light', 'theme-dark', 'theme-purple');
+        // Önce bütün tema classlarını temizle
+        document.body.classList.remove('theme-light', 'theme-turquoise', 'theme-purple');
         
-        // Yeni temayı ekle
+        // Light tema için body'ye doğru class'ı ekle
         if (theme === 'light') {
             document.body.classList.add('theme-light');
-        } else if (theme === 'dark') {
-            document.body.classList.add('theme-dark');
-        } else if (theme === 'purple') {
+            // Light tema için HTML'yi de ekle (CSS variables için)
+            document.documentElement.classList.add('light-theme');
+            document.documentElement.classList.remove('theme-purple');
+        } else {
+            // Mor tema için
             document.body.classList.add('theme-purple');
+            // Light tema class'ını html'den kaldır
+            document.documentElement.classList.remove('light-theme');
+            document.documentElement.classList.add('theme-purple');
         }
     }
     
     // Tema değiştirme butonunu güncelle
     function updateThemeToggleButton(theme) {
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
         if (!themeToggleBtn) return;
         
+        // Düğmenin içeriğini temaya göre güncelle
         if (theme === 'light') {
-            themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
-            if (window.t) {
-                themeToggleBtn.title = window.t('lightTheme');
-            }
-        } else {
             themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-            if (window.t) {
-                themeToggleBtn.title = window.t('darkTheme');
-            }
+            themeToggleBtn.title = 'Koyu Temaya Geç';
+        } else {
+            themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
+            themeToggleBtn.title = 'Açık Temaya Geç';
         }
     }
     
     // Yazı boyutunu uygula
     function applyFontSize(size) {
-        // Önceki boyutları temizle
-        document.body.classList.remove('font-small', 'font-medium', 'font-large');
-        
-        // Yeni boyutu ekle
-        document.body.classList.add(`font-${size}`);
+        document.documentElement.style.fontSize = getFontSizeValue(size);
     }
     
-    // Dil adını al
+    // Yazı boyutu değerini al
+    function getFontSizeValue(size) {
+        switch(size) {
+            case 'small':
+                return '14px';
+            case 'large':
+                return '18px';
+            default:
+                return '16px';
+        }
+    }
+    
     function getLanguageName(code) {
         const languages = {
             'tr': 'Türkçe',
@@ -265,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return languages[code] || code;
     }
     
-    // Yazı boyutu adını al
     function getFontSizeName(size) {
         const sizes = {
             'small': 'Küçük',
@@ -275,58 +247,17 @@ document.addEventListener('DOMContentLoaded', function() {
         return sizes[size] || size;
     }
     
-    // Tema adını al
     function getThemeName(theme) {
         const themes = {
             'light': 'Açık',
-            'dark': 'Koyu',
             'purple': 'Mor'
         };
         return themes[theme] || theme;
     }
     
-    // Toast bildirimi göster
     function showToast(message, type = 'info') {
-        // Ana uygulamadaki toast fonksiyonunu kullan
         if (window.showToast) {
             window.showToast(message, type);
-        } else {
-            // Toast fonksiyonu yoksa basit bir toast oluştur
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            let icon = 'info-circle';
-            if (type === 'success') icon = 'check-circle';
-            if (type === 'error') icon = 'exclamation-circle';
-            if (type === 'warning') icon = 'exclamation-triangle';
-            
-            toast.innerHTML = `
-                <div class="toast-icon"><i class="fas fa-${icon}"></i></div>
-                <div class="toast-message">${message}</div>
-                <button class="toast-close"><i class="fas fa-times"></i></button>
-            `;
-            
-            // Toast konteyneri oluştur veya mevcut olanı kullan
-            let toastContainer = document.querySelector('.toast-container');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.className = 'toast-container';
-                document.body.appendChild(toastContainer);
-            }
-            
-            // Toastı ekle
-            toastContainer.appendChild(toast);
-            
-            // Kapatma butonu
-            const closeBtn = toast.querySelector('.toast-close');
-            closeBtn.addEventListener('click', function() {
-                toast.remove();
-            });
-            
-            // Otomatik kapat
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
         }
     }
 });
