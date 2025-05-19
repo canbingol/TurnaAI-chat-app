@@ -14,22 +14,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const menuToggle = document.querySelector('.menu-toggle');
     const sidebar = document.querySelector('.sidebar');
     const modeBtns = document.querySelectorAll('.mode-btn');
-    const attachBtn = document.getElementById('attach-btn');
-    const fileModal = document.getElementById('file-modal');
-    const closeModals = document.querySelectorAll('.close-modal');
+    const modelBtns = document.querySelectorAll('.model-btn');
     const exportBtn = document.getElementById('export-btn');
-    const micBtn = document.getElementById('mic-btn');
     const suggestionChips = document.querySelectorAll('.suggestion-chip');
     const conversationsList = document.querySelector('.conversations-list');
     const themeOptions = document.querySelectorAll('.theme-option');
     const userNameDisplay = document.querySelector('.user-name');
     const userEmailDisplay = document.querySelector('.user-email');
-    const logoutBtn = document.querySelector('.profile-options [href="#"]:last-child');
+    const logoutBtn = document.querySelector('.profile-options [href="#"]:last-child span');
+    const mainHistoryBtn = document.querySelector('.history-btn');
+    const profileMenuHistoryBtn = document.querySelector('.profile-options .history-btn');
+    const historyModal = document.querySelector('.history-modal');
+    
+    // Opsiyonel elementler (mevcut olmayabilir)
+    const attachBtn = document.getElementById('attach-btn'); // Dosya yükleme butonu
+    const fileModal = document.getElementById('file-modal'); // Dosya yükleme modalı
+    const closeModals = document.querySelectorAll('.close-modal'); // Modal kapatma butonları
+
+    // Yeni DOM elementleri
+    const profilePreferencesBtn = document.querySelector('.profile-options .preferences-btn');
+    const mainPreferencesBtn = document.querySelector('.settings-btn');
 
     // Uygulama durumu
     let currentTheme = 'purple';
     let darkMode = true;
     let currentMode = 'normal';
+    let currentModel = 'turnaV1'; // Varsayılan model
     let isRecording = false;
     let isAuthenticated = false;
     let currentUser = null;
@@ -80,6 +90,26 @@ document.addEventListener('DOMContentLoaded', function () {
             toast.remove();
         }, 3000);
     }
+
+    // Model seçimi için event listener'lar
+    modelBtns.forEach(button => {
+        button.addEventListener('click', function () {
+            // Aktif sınıfını kaldır
+            modelBtns.forEach(btn => btn.classList.remove('active'));
+
+            // Tıklanan butona aktif sınıfı ekle
+            this.classList.add('active');
+
+            // Seçilen modeli güncelle
+            currentModel = this.getAttribute('data-model');
+
+            // Toast bildirimi göster
+            const modelName = currentModel === 'turnaV1' ? 'TurnaV1' : 'Gemini';
+            showToast(`Model "${modelName}" olarak değiştirildi`, 'info');
+
+            console.log('Seçilen model:', currentModel);
+        });
+    });
 
     // Kullanıcı kimlik doğrulama durumunu kontrol et
     async function checkAuthStatus() {
@@ -337,11 +367,40 @@ document.addEventListener('DOMContentLoaded', function () {
     async function loadConversation(conversationId) {
         if (conversationId) {
             await loadMessages(conversationId);
+            // Sohbet yüklendi event'ini tetikle
+            document.dispatchEvent(new Event('conversationLoaded'));
         }
     }
 
     // Yeni sohbet oluştur ve veritabanına kaydet
     async function createNewConversation() {
+        // Misafir modunda sadece localde yeni bir sohbet oluştur
+        if (sessionStorage.getItem('isGuestMode') === 'true') {
+            const newConversation = {
+                id: 'guest-' + Date.now(),
+                title: 'Misafir Sohbeti',
+                messages: []
+            };
+            conversations.push(newConversation);
+            addConversationToSidebar(newConversation);
+            currentConversation = {
+                id: newConversation.id,
+                title: newConversation.title,
+                messages: []
+            };
+            resetChatArea();
+            updateGuestConversationTitle();
+            updateActiveSidebar(newConversation.id);
+
+            // Çıkış butonunu güncelle
+            const logoutBtn = document.querySelector('.profile-options [href="#"]:last-child span');
+            if (logoutBtn) {
+                logoutBtn.textContent = 'Giriş Yap';
+            }
+
+            return newConversation.id;
+        }
+        // Normal kullanıcı için API'ye istek at
         try {
             const response = await fetch('/api/conversations', {
                 method: 'POST',
@@ -360,25 +419,20 @@ document.addEventListener('DOMContentLoaded', function () {
                     messages: []
                 };
 
-                // Yeni sohbeti ekle
                 conversations.push(newConversation);
                 addConversationToSidebar(newConversation);
-
-                // Yeni sohbeti currentConversation olarak ayarla
                 currentConversation = {
                     id: newConversation.id,
                     title: newConversation.title,
                     messages: []
                 };
 
-                // Sohbet alanını temizle
                 resetChatArea();
-
-                // Başlığı güncelle
                 document.querySelector('.conversation-title').textContent = newConversation.title;
-
-                // Aktif sohbeti işaretle
                 updateActiveSidebar(newConversation.id);
+
+                // Yeni sohbet oluşturuldu event'ini tetikle
+                document.dispatchEvent(new Event('conversationCreated'));
 
                 return newConversation.id;
             } else {
@@ -420,6 +474,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     createNewConversation();
                 }
+
+                // Sohbet silindi event'ini tetikle
+                document.dispatchEvent(new Event('conversationDeleted'));
 
                 showToast('Sohbet silindi', 'info');
                 return true;
@@ -477,176 +534,64 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Tema değiştirme
-    themeToggleBtn.addEventListener('click', function () {
-        darkMode = !darkMode;
-        if (darkMode) {
-            document.body.classList.remove('theme-light');
-            document.body.classList.add('theme-dark');
-            themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-
-            // Tema seçimi butonlarını güncelle
-            themeOptions.forEach(option => {
-                if (option.dataset.theme === 'dark') {
-                    option.classList.add('active');
-                } else {
-                    option.classList.remove('active');
-                }
-            });
-
-            // Toast bildirimi göster
-            showToast(window.t ? window.t('themeChanged') + ': ' + window.t('dark') : 'Tema değiştirildi: Koyu', 'info');
-
-            // Ayarları kaydet
-            saveThemeSettings('dark');
+    // Tema değiştirme işlevi
+    function applyTheme(theme) {
+        console.log("Old applyTheme in script.js called - using global toggleTheme instead");
+        // Global toggleTheme fonksiyonunu kullan
+        if (window.toggleTheme) {
+            window.toggleTheme(theme);
         } else {
-            document.body.classList.remove('theme-dark');
-            document.body.classList.add('theme-light');
-            themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
-
-            // Tema seçimi butonlarını güncelle
-            themeOptions.forEach(option => {
-                if (option.dataset.theme === 'light') {
-                    option.classList.add('active');
-                } else {
-                    option.classList.remove('active');
-                }
-            });
-
-            // Toast bildirimi göster
-            showToast(window.t ? window.t('themeChanged') + ': ' + window.t('light') : 'Tema değiştirildi: Açık', 'info');
-
-            // Ayarları kaydet
-            saveThemeSettings('light');
-        }
-    });
-
-    // Tema ayarlarını kaydet
-    function saveThemeSettings(theme) {
-        try {
-            const settings = JSON.parse(localStorage.getItem('turnaSettings')) || {};
-            settings.theme = theme;
-            localStorage.setItem('turnaSettings', JSON.stringify(settings));
-        } catch (error) {
-            console.error('Tema ayarları kaydedilemedi:', error);
+            console.error("toggleTheme function not found");
         }
     }
 
-    // Tema ayarlarını yükle
-    function loadThemeSettings() {
-        try {
-            const settings = JSON.parse(localStorage.getItem('turnaSettings')) || {};
-            const theme = settings.theme || 'dark'; // varsayılan olarak koyu tema
-
-            if (theme === 'light') {
-                darkMode = false;
-                document.body.classList.add('theme-light');
-                document.body.classList.remove('theme-dark');
-                themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
-
-                // Tema seçimi butonlarını güncelle
-                themeOptions.forEach(option => {
-                    if (option.dataset.theme === 'light') {
-                        option.classList.add('active');
-                    } else {
-                        option.classList.remove('active');
-                    }
-                });
-            } else if (theme === 'purple') {
-                darkMode = true;
-                document.body.classList.add('theme-purple');
-                document.body.classList.remove('theme-dark', 'theme-light');
-                themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-
-                // Tema seçimi butonlarını güncelle
-                themeOptions.forEach(option => {
-                    if (option.dataset.theme === 'purple') {
-                        option.classList.add('active');
-                    } else {
-                        option.classList.remove('active');
-                    }
-                });
-            } else {
-                // Koyu tema (varsayılan)
-                darkMode = true;
-                document.body.classList.add('theme-dark');
-                document.body.classList.remove('theme-light');
-                themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-
-                // Tema seçimi butonlarını güncelle
-                themeOptions.forEach(option => {
-                    if (option.dataset.theme === 'dark') {
-                        option.classList.add('active');
-                    } else {
-                        option.classList.remove('active');
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Tema ayarları yüklenemedi:', error);
-        }
-    }
-
-    // Tema seçenekleri
-    themeOptions.forEach(option => {
-        option.addEventListener('click', function () {
-            const theme = this.dataset.theme;
-
-            // Aktif tema butonunu güncelle
-            themeOptions.forEach(opt => opt.classList.remove('active'));
-            this.classList.add('active');
-
-            // Tema değişikliğini uygula
-            document.body.className = '';
-            document.body.classList.add(`theme-${theme}`);
-            currentTheme = theme;
-
-            // Tema toggle butonunu güncelle
-            if (theme === 'light') {
-                darkMode = false;
-                themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
-            } else {
-                darkMode = true;
-                themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-            }
-
-            // Ayarları kaydet
-            saveThemeSettings(theme);
-
-            // Toast bildirimi göster
-            showToast(window.t ? window.t('themeChanged') + ': ' + window.t(theme) :
-                `Tema "${theme}" olarak değiştirildi`, 'success');
+    // Tema seçenekleri için event listener'lar
+    document.querySelectorAll('.theme-option').forEach(option => {
+        option.addEventListener('click', function() {
+            // Bu işlevi kaldır, tema.js ve settings.js üzerinden yönetiliyor
+            console.log("Theme option click handled in script.js - should be handled by settings.js or theme.js");
         });
     });
 
-    // Mobil menü toggle
-    menuToggle.addEventListener('click', function () {
-        sidebar.classList.toggle('show');
+    // Uygulama başladığında ayarları senkronize et
+    document.addEventListener('DOMContentLoaded', function() {
+        setupSettingsSync();
     });
 
-    // Mobil menü dışına tıklama ile kapatma
-    document.addEventListener('click', function (e) {
-        if (sidebar.classList.contains('show') &&
-            !sidebar.contains(e.target) &&
-            !menuToggle.contains(e.target)) {
-            sidebar.classList.remove('show');
-        }
-    });
+    // Geçmiş butonlarını senkronize et
+    if (profileMenuHistoryBtn && mainHistoryBtn) {
+        profileMenuHistoryBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const historyModal = document.querySelector('.history-modal');
+            if (historyModal) {
+                historyModal.classList.add('show');
+                profileMenu.classList.remove('show'); // Profil menüsünü kapat
+            }
+        });
 
-    // Ayarlar panelini aç/kapat
-    settingsBtn.addEventListener('click', function () {
-        settingsPanel.classList.add('show');
-    });
+        mainHistoryBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const historyModal = document.querySelector('.history-modal');
+            if (historyModal) {
+                historyModal.classList.add('show');
+            }
+        });
+    }
 
-    closeSettings.addEventListener('click', function () {
-        settingsPanel.classList.remove('show');
-    });
+    // Kullanıcı profil menüsü için event listener
+    if (userProfile && profileMenu) {
+        userProfile.addEventListener('click', function(e) {
+            e.stopPropagation();
+            profileMenu.classList.toggle('show');
+        });
 
-    // Kullanıcı profil menüsünü aç/kapat
-    userProfile.addEventListener('click', function (e) {
-        e.stopPropagation();
-        profileMenu.classList.toggle('show');
-    });
+        // Dışarı tıklandığında menüyü kapat
+        document.addEventListener('click', function(e) {
+            if (!profileMenu.contains(e.target) && !userProfile.contains(e.target)) {
+                profileMenu.classList.remove('show');
+            }
+        });
+    }
 
     // Çıkış butonuna tıklama işlevi
     if (logoutBtn) {
@@ -665,7 +610,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // Eğer ayarlar paneli açıksa ve dışına tıklanırsa kapat
         if (settingsPanel.classList.contains('show') &&
             !settingsPanel.contains(event.target) &&
-            !settingsBtn.contains(event.target)) {
+            !settingsBtn.contains(event.target) &&
+            !profilePreferencesBtn.contains(event.target)) {
             settingsPanel.classList.remove('show');
         }
     });
@@ -676,22 +622,28 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Modalları aç/kapat
-    attachBtn.addEventListener('click', function () {
-        fileModal.classList.add('show');
-    });
-
-    closeModals.forEach(closeBtn => {
-        closeBtn.addEventListener('click', function () {
-            // Bu butonun en yakın modal parent'ını bul ve gizle
-            const modal = this.closest('.modal');
-            modal.classList.remove('show');
+    if (attachBtn && fileModal) {
+        attachBtn.addEventListener('click', function () {
+            fileModal.classList.add('show');
         });
-    });
+    }
+
+    if (closeModals && closeModals.length > 0) {
+        closeModals.forEach(closeBtn => {
+            closeBtn.addEventListener('click', function () {
+                // Bu butonun en yakın modal parent'ını bul ve gizle
+                const modal = this.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('show');
+                }
+            });
+        });
+    }
 
     // Modlar arası geçiş
     modeBtns.forEach(btn => {
         btn.addEventListener('click', function () {
-            const mode = this.dataset.mode;
+            const mode = this.getAttribute('data-mode');
 
             // Aktif mod butonunu güncelle
             modeBtns.forEach(b => b.classList.remove('active'));
@@ -703,72 +655,20 @@ document.addEventListener('DOMContentLoaded', function () {
             // Toast bildirimi göster
             showToast(window.t ? window.t('modeChanged') + ': ' + window.t(mode) :
                 `Mod "${mode}" olarak değiştirildi`, 'info');
+                
+            console.log('Mod değiştirildi:', mode); // Debug log
         });
     });
 
-    // Öneri çipleri
+    // Öneri çiplerine tıklama olayı
     suggestionChips.forEach(chip => {
-        chip.addEventListener('click', function () {
-            const text = this.textContent;
-            userInput.value = text;
+        chip.addEventListener('click', function() {
+            // Çip değerini metin kutusuna ekle
+            userInput.value = this.textContent;
+            // Metin kutusuna odaklan
             userInput.focus();
         });
     });
-
-    // Mikrofon butonu
-    micBtn.addEventListener('click', function () {
-        if (isRecording) {
-            // Kaydı durdur
-            stopSpeechRecognition();
-            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-            micBtn.style.color = '';
-            isRecording = false;
-        } else {
-            // Kaydı başlat
-            startSpeechRecognition();
-            micBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
-            micBtn.style.color = 'var(--danger-red)';
-            isRecording = true;
-        }
-    });
-
-    // Konuşma tanıma
-    function startSpeechRecognition() {
-        if ('webkitSpeechRecognition' in window) {
-            const recognition = new webkitSpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = true;
-            recognition.lang = 'tr-TR'; // Dil seçimi
-
-            recognition.onresult = function (event) {
-                const result = event.results[0][0].transcript;
-                userInput.value = result;
-            };
-
-            recognition.onerror = function (event) {
-                console.error('Konuşma tanıma hatası:', event.error);
-                stopSpeechRecognition();
-                showToast('Ses tanıma başlatılamadı', 'error');
-            };
-
-            recognition.onend = function () {
-                micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-                micBtn.style.color = '';
-                isRecording = false;
-            };
-
-            recognition.start();
-            window.recognition = recognition;
-        } else {
-            showToast('Tarayıcınız ses tanımayı desteklemiyor', 'error');
-        }
-    }
-
-    function stopSpeechRecognition() {
-        if (window.recognition) {
-            window.recognition.stop();
-        }
-    }
 
     // Sohbeti dışa aktar
     exportBtn.addEventListener('click', function () {
@@ -808,6 +708,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const capability2Msg = window.t ? window.t('capability2') : 'Yaratıcı içerik oluşturabilirim';
         const capability3Msg = window.t ? window.t('capability3') : 'Metinleri düzenleyebilirim';
         const capability4Msg = window.t ? window.t('capability4') : 'Kodlama yardımı sunabilirim';
+        // resetChatArea devamı
         const copyMsg = window.t ? window.t('copy') : 'Kopyala';
         const likeMsg = window.t ? window.t('like') : 'Beğen';
         const dislikeMsg = window.t ? window.t('dislike') : 'Beğenme';
@@ -895,8 +796,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Mesajı sohbete ekle
     function addMessage(text, isUser = false, saveToHistory = true) {
+        // Misafir modunda ve kullanıcı mesajıysa ve ilk mesajsa, ekranı temizle
+        if (sessionStorage.getItem('isGuestMode') === 'true' && isUser) {
+            // Sadece bir tane mesaj varsa (bu ilk mesaj olacak)
+            if (chatMessages.querySelectorAll('.message').length === 0) {
+                // Ekranı temizle
+                chatMessages.innerHTML = '';
+            }
+        }
+
         const messageDiv = document.createElement('div');
-        messageDiv.className = isUser ? 'message user' : 'message bot';
+        messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
 
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
@@ -973,21 +883,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 isUser,
                 timestamp: new Date()
             });
-
-            // Eğer bu ilk kullanıcı mesajıysa, sohbet başlığını güncelle
-            if (isUser && currentConversation.messages.filter(msg => msg.isUser).length === 1) {
-                const title = text.substring(0, 20) + (text.length > 20 ? "..." : "");
-
-                // Başlığı yerel olarak güncelle
+            // Sohbet başlığını her mesajda güncelle
+            if (sessionStorage.getItem('isGuestMode') === 'true') {
+                updateGuestConversationTitle();
+            } else if (isUser && currentConversation.messages.filter(msg => msg.isUser).length === 1) {
+                // Sadece düz metin olarak başlık güncelle
+                const title = text.replace(/<[^>]*>/g, '').substring(0, 20) + (text.replace(/<[^>]*>/g, '').length > 20 ? '...' : '');
                 document.querySelector('.conversation-title').textContent = title;
                 currentConversation.title = title;
-
-                // Başlığı veritabanında güncelle
                 if (currentConversation.id) {
                     updateConversationTitle(currentConversation.id, title);
                 }
-
-                // Sidebar'daki başlığı güncelle
                 const conversationItem = document.querySelector(`.conversation-item[data-id="${currentConversation.id}"] span`);
                 if (conversationItem) {
                     conversationItem.textContent = title;
@@ -1113,10 +1019,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Temizle butonuna basıldığında girdi alanını temizle
-    clearButton.addEventListener('click', function () {
-        userInput.value = '';
-        userInput.focus();
-    });
+    if (clearButton) {
+        clearButton.addEventListener('click', function () {
+            userInput.value = '';
+            userInput.focus();
+        });
+    }
 
     // Mesajı API'ye gönder
     async function sendMessage() {
@@ -1126,12 +1034,45 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // Eğer henüz bir sohbet yoksa veya currentConversation.id null ise, yeni sohbet oluştur
-        if (!currentConversation.id) {
-            const newConversationId = await createNewConversation();
-            if (!newConversationId) {
-                showToast('Sohbet oluşturulamadı. Lütfen tekrar deneyin.', 'error');
+        // Gönder butonunu devre dışı bırak
+        const sendButton = document.getElementById('send-button');
+        if (sendButton) {
+            sendButton.disabled = true;
+            sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        // Misafir kullanıcı için mesaj limiti kontrolü
+        if (!isAuthenticated) {
+            const remainingMessages = parseInt(sessionStorage.getItem('guestRemainingMessages') || '5');
+            
+            if (remainingMessages <= 0) {
+                showToast('Mesaj limitine ulaştınız. Lütfen giriş yapın.', 'warning');
+                const loginModal = document.querySelector('.auth-modal');
+                if (loginModal) {
+                    loginModal.style.display = 'flex';
+                }
+                // Gönder butonunu aktif et
+                if (sendButton) {
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                }
                 return;
+            }
+            
+            // Mesaj sayacını azalt ve kaydet
+            const newRemainingMessages = remainingMessages - 1;
+            sessionStorage.setItem('guestRemainingMessages', newRemainingMessages.toString());
+            updateRemainingMessagesDisplay();
+
+            // Son mesaj hakkını kullandıysa uyarı göster
+            if (newRemainingMessages === 0) {
+                setTimeout(() => {
+                    showToast('Son mesaj hakkınızı kullandınız. Devam etmek için giriş yapmanız gerekiyor.', 'warning');
+                    const loginModal = document.querySelector('.auth-modal');
+                    if (loginModal) {
+                        loginModal.style.display = 'flex';
+                    }
+                }, 1000);
             }
         }
 
@@ -1145,20 +1086,19 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading();
 
         try {
-            // Kullanıcı kimlik doğrulama kontrolü
+            // API'ye istek gönder
             let endpoint = '/api/generate';
             let requestBody = {
                 prompt: message,
-                mode: currentMode
+                mode: currentMode,
+                model: currentModel
             };
 
-            // Eğer kullanıcı giriş yapmışsa ve bir sohbet kimliği varsa
             if (isAuthenticated && currentConversation.id) {
                 endpoint = '/api/messages';
                 requestBody.conversation_id = currentConversation.id;
             }
 
-            // API'ye istek gönder
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -1173,22 +1113,17 @@ document.addEventListener('DOMContentLoaded', function () {
             if (response.ok) {
                 // AI yanıtını ekle
                 addMessage(data.response);
-
-                // Mesaj alma olayını tetikle (ses bildirimleri için)
                 document.dispatchEvent(new Event('messageReceived'));
-
-                // Kod kopyalama butonlarını etkinleştir
                 setupCodeCopyButtons();
             } else {
-                // Eğer kimlik doğrulama hatası varsa ve login.html sayfası varsa, kullanıcıyı giriş sayfasına yönlendir
                 if (response.status === 401) {
                     showToast('Oturum süresi doldu. Lütfen tekrar giriş yapın.', 'error');
-                    setTimeout(() => {
-                        window.location.href = '/login.html';
-                    }, 2000);
+                    const loginModal = document.querySelector('.auth-modal');
+                    if (loginModal) {
+                        loginModal.style.display = 'flex';
+                    }
                     return;
                 }
-
                 const errorMsg = window.t ? window.t('error') : 'Bir hata oluştu. Lütfen tekrar deneyin.';
                 showError(data.error || errorMsg);
             }
@@ -1197,6 +1132,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const networkErrorMsg = window.t ? window.t('networkError') : 'Ağ hatası. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.';
             showError(networkErrorMsg);
             console.error('Error:', error);
+        } finally {
+            // İşlem tamamlandığında gönder butonunu aktif et
+            if (sendButton) {
+                sendButton.disabled = false;
+                sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
+            }
         }
     }
 
@@ -1257,155 +1198,58 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Dosya yükleme işlevleri
-    const browseBtn = document.querySelector('.browse-btn');
-    const fileInput = document.getElementById('file-input');
-
-    if (browseBtn && fileInput) {
-        browseBtn.addEventListener('click', function () {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener('change', function () {
-            if (this.files.length > 0) {
-                // Dosya seçildi
-                const file = this.files[0];
-                const uploadBtn = document.querySelector('.upload-btn');
-
-                // Butonu etkinleştir
-                uploadBtn.disabled = false;
-
-                // Dosya bilgilerini göster
-                const uploadArea = document.querySelector('.upload-area');
-                uploadArea.innerHTML = `
-                <div class="uploaded-files">
-                    <div class="file-item">
-                        <i class="file-icon fas fa-file"></i>
-                        <div class="file-info">
-                            <div class="file-name">${file.name}</div>
-                            <div class="file-size">${formatFileSize(file.size)}</div>
-                        </div>
-                        <button class="file-remove"><i class="fas fa-times"></i></button>
-                    </div>
-                </div>
-            `;
-
-                // Dosyayı kaldır butonu
-                const removeBtn = document.querySelector('.file-remove');
-                removeBtn.addEventListener('click', function () {
-                    fileInput.value = '';
-                    uploadBtn.disabled = true;
-
-                    const dragDropText = window.t ? window.t('dragDrop') : 'Dosyalarınızı buraya sürükleyin veya';
-                    const chooseBtnText = window.t ? window.t('chooseFile') : 'Dosya Seçin';
-
-                    uploadArea.innerHTML = `
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <p>${dragDropText}</p>
-                    <button class="browse-btn">${chooseBtnText}</button>
-                `;
-
-                    // Browse butonunu yeniden etkinleştir
-                    document.querySelector('.browse-btn').addEventListener('click', function () {
-                        fileInput.click();
-                    });
-                });
-
-                // Yükle butonu
-                uploadBtn.addEventListener('click', function () {
-                    // Burada gerçek bir uygulamada dosya sunucuya yüklenirdi
-
-                    // İlerleme göstergesi göster
-                    const uploadingText = window.t ? window.t('uploading') : 'Yükleniyor...';
-
-                    const progressHTML = `
-                    <div class="upload-progress show">
-                        <div class="progress-bar-container">
-                            <div class="progress-bar" style="width: 0%"></div>
-                        </div>
-                        <div class="progress-text">
-                            <span>${uploadingText}</span>
-                            <span>0%</span>
-                        </div>
-                    </div>
-                `;
-
-                    uploadArea.insertAdjacentHTML('beforeend', progressHTML);
-
-                    // İlerleme animasyonu
-                    let progress = 0;
-                    const progressBar = document.querySelector('.progress-bar');
-                    const progressText = document.querySelector('.progress-text span:last-child');
-
-                    const interval = setInterval(() => {
-                        progress += 5;
-                        progressBar.style.width = `${progress}%`;
-                        progressText.textContent = `${progress}%`;
-
-                        if (progress >= 100) {
-                            clearInterval(interval);
-                            document.getElementById('file-modal').classList.remove('show');
-
-                            const uploadedMsg = window.t ?
-                                window.t('fileUploaded').replace('{filename}', file.name) :
-                                `"${file.name}" dosyası başarıyla yüklendi`;
-
-                            showToast(uploadedMsg, 'success');
-
-                            // Mesaj alanına dosya bilgisi ekle
-                            userInput.value += `\n[Ek dosya: ${file.name}] `;
-                            userInput.focus();
-                        }
-                    }, 100);
-                });
-            }
-        });
-    }
-
-    // Dosya boyutu formatla
-    function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-        else return (bytes / 1048576).toFixed(1) + ' MB';
-    }
-
-    // Olay dinleyicileri
-    sendButton.addEventListener('click', sendMessage);
-
-    userInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-
-    // Başlangıç fonksiyonları
+    // Uygulamayı başlat
     function initializeApp() {
-        // Tema ayarlarını yükle
-        loadThemeSettings();
+        console.log('Uygulama başlatılıyor...');
 
         // Kullanıcı kimlik doğrulama durumunu kontrol et
-        // Bu, otomatik olarak sohbetleri de yükleyecek
-        checkAuthStatus().then(isLoggedIn => {
-            if (!isLoggedIn) {
-                // Eğer giriş yapılmamışsa demo modunda çalış
-                showToast('Demo modunda çalışıyorsunuz. Sohbetleriniz kaydedilmeyecek.', 'warning');
-                // Sayfa yeniden yüklendiğinde yeni bir sohbet başlat
-                resetChatArea();
+        checkAuthStatus().then(authResult => {
+            // Eğer misafir modunda ise veya kimlik doğrulama başarılıysa, UI'ı güncelle
+            if (authResult || sessionStorage.getItem('isGuestMode') === 'true') {
+                console.log('Kullanıcı oturumu açık veya misafir modu aktif, UI güncelleniyor...');
+                // Sayfa yüklendiğinde önceki tema ayarlarını yükle
+                loadThemeSettings();
+                updateUITexts();
+
+                // Varsayılan konuşma oluştur veya son konuşmaları getir
+                if (isAuthenticated) {
+                    loadConversationsFromDB();
+                } else if (sessionStorage.getItem('isGuestMode') === 'true') {
+                    // Misafir modunda yeni konuşma oluştur
+                    createNewConversation();
+                    // Misafir modu sayacını göster
+                    updateRemainingMessagesDisplay();
+                }
+
+                // Sayfa yüklendiğinde girdi alanına odaklan
+                userInput.focus();
+
+                // Kod kopyalama butonlarını etkinleştir
+                setupCodeCopyButtons();
+
+                // Dil ve tema değişikliği için event listener'lar ekle
+                document.addEventListener('languageChanged', function () {
+                    // Arayüz elemanlarını güncelle
+                    updateUITexts();
+                });
+
+                // Yükleme ekranını gizle
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }, 500);
+            } else {
+                // Giriş yapılmamışsa ve misafir modu aktif değilse, auth modalı göster
+                if (typeof window.showAuthModal === 'function') {
+                    window.showAuthModal();
+                }
+                // Yükleme ekranını gizle
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }, 500);
             }
         });
 
-        // Sayfa yüklendiğinde girdi alanına odaklan
-        userInput.focus();
-
-        // Kod kopyalama butonlarını etkinleştir
-        setupCodeCopyButtons();
-
-        // Dil ve tema değişikliği için event listener'lar ekle
-        document.addEventListener('languageChanged', function () {
-            // Arayüz elemanlarını güncelle
-            updateUITexts();
-        });
+        setupSidebarToggle();
     }
 
     // Uygulama başlangıcı için sahte yükleme ekranı
@@ -1443,8 +1287,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Buton başlıkları
         if (sendButton) sendButton.title = window.t('send');
         if (clearButton) clearButton.title = window.t('clear');
-        if (micBtn) micBtn.title = window.t('voiceInput');
-        if (attachBtn) attachBtn.title = window.t('attachFile');
         if (exportBtn) exportBtn.title = window.t('export');
 
         // Öneri çiplerini güncelle - bu kısım translations.js tarafından yönetiliyor
@@ -1528,6 +1370,324 @@ document.addEventListener('DOMContentLoaded', function () {
     // Uygulama başladığında
     showAppLoading();
     initializeApp();
+
+    // Kalan mesaj sayısını gösteren fonksiyon
+    function updateRemainingMessagesDisplay() {
+        // Eğer varsa eski mesaj sayacını kaldır
+        const existingCounter = document.getElementById('guest-message-counter');
+        if (existingCounter) {
+            existingCounter.remove();
+        }
+        
+        // Misafir modu kontrolü
+        if (sessionStorage.getItem('isGuestMode') === 'true') {
+            // Kalan mesaj sayısını al
+            const remainingMessages = sessionStorage.getItem('guestRemainingMessages') || '5';
+            
+            // Sağ üst köşeye sayacı ekle
+            const counter = document.createElement('div');
+            counter.id = 'guest-message-counter';
+            counter.className = 'guest-counter';
+            counter.innerHTML = `${remainingMessages}`;
+            counter.title = `Kalan mesaj hakkınız: ${remainingMessages}`;
+            
+            // CSS ekle
+            counter.style.position = 'fixed';
+            counter.style.top = '10px';
+            counter.style.right = '80px';
+            counter.style.backgroundColor = 'var(--primary-color)';
+            counter.style.color = 'white';
+            counter.style.padding = '5px 10px';
+            counter.style.borderRadius = '20px';
+            counter.style.fontSize = '14px';
+            counter.style.zIndex = '1001';
+            counter.style.display = 'flex';
+            counter.style.alignItems = 'center';
+            counter.style.justifyContent = 'center';
+            counter.style.minWidth = '24px';
+            counter.style.height = '24px';
+            counter.style.cursor = 'help';
+            counter.style.userSelect = 'none';
+            
+            document.body.appendChild(counter);
+
+            // Gönder butonunu kontrol et
+            const sendButton = document.getElementById('send-button');
+            if (sendButton) {
+                if (parseInt(remainingMessages) <= 0) {
+                    sendButton.disabled = true;
+                    sendButton.title = 'Mesaj hakkınız kalmadı';
+                } else {
+                    sendButton.disabled = false;
+                    sendButton.title = 'Gönder';
+                }
+            }
+        }
+    }
+    
+    // Uygulama başlangıcında ve misafir girişi yapıldığında sayaç gösterilsin
+    function initializeGuestMode() {
+        if (sessionStorage.getItem('isGuestMode') === 'true') {
+            updateRemainingMessagesDisplay();
+            updateGuestConversationTitle();
+            
+            // Çıkış butonunu güncelle
+            const logoutBtn = document.querySelector('.profile-options [href="#"]:last-child span');
+            if (logoutBtn) {
+                logoutBtn.textContent = 'Giriş Yap';
+                
+                // Parent elementi bul ve click event'ini güncelle
+                const logoutLink = logoutBtn.closest('a');
+                if (logoutLink) {
+                    logoutLink.removeEventListener('click', logout);
+                    logoutLink.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const loginModal = document.querySelector('.auth-modal');
+                        if (loginModal) {
+                            loginModal.style.display = 'flex';
+                        }
+                    });
+                }
+            }
+        }
+    }
+    
+    // Global erişim için fonksiyonları window objesine ekle
+    window.updateRemainingMessagesDisplay = updateRemainingMessagesDisplay;
+    window.updateGuestConversationTitle = updateGuestConversationTitle;
+    
+    // Sayfa yüklendiğinde misafir modu kontrolü yap
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeGuestMode();
+    });
+
+    // Sohbet başlığını güncelleyen fonksiyon
+    function updateGuestConversationTitle() {
+        if (sessionStorage.getItem('isGuestMode') === 'true') {
+            const remaining = sessionStorage.getItem('guestRemainingMessages') || '5';
+            const titleEl = document.querySelector('.conversation-title');
+            if (titleEl) {
+                titleEl.textContent = `Misafir Sohbeti`;
+            }
+
+        }
+    }
+
+    // Enter tuşuyla mesaj gönderme
+    if (userInput) {
+        userInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    // Gönder butonuna tıklama ile mesaj gönderme
+    if (sendButton) {
+        sendButton.addEventListener('click', function() {
+            sendMessage();
+        });
+    }
+
+    // Bu fonksiyon tamamlandıktan sonra sendMessage fonksiyonunu global yap
+    document.addEventListener('DOMContentLoaded', function() {
+        window.sendMessage = sendMessage;
+    });
+
+    // Sohbet geçmişi işlevselliği
+    function setupHistoryFunctionality() {
+        // Sohbet geçmişi listesini güncelle
+        function updateHistoryModal() {
+            const historyList = document.querySelector('.history-list');
+            if (!historyList || !conversations.length) return;
+
+            // Geçmiş listesini temizle
+            historyList.innerHTML = '';
+            
+            // Tüm sohbetleri göster
+            conversations.forEach(conv => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.dataset.id = conv.id;
+                
+                historyItem.innerHTML = `
+                    <div class="history-item-header">
+                        <h4>${conv.title}</h4>
+                    </div>
+                    <p class="history-preview">${conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text.substring(0, 100) + '...' : 'Henüz mesaj yok'}</p>
+                    <div class="history-actions">
+                        <button class="history-continue"><i class="fas fa-play"></i> Devam Et</button>
+                        <button class="history-delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+
+                // Tıklama olaylarını ekle
+                const continueBtn = historyItem.querySelector('.history-continue');
+                const deleteBtn = historyItem.querySelector('.history-delete');
+
+                // Devam Et butonuna tıklama
+                continueBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Event bubbling'i engelle
+                    const conversationId = historyItem.dataset.id;
+                    loadConversation(conversationId);
+                    // Modalı kapat
+                    const historyModal = document.querySelector('.history-modal');
+                    if (historyModal) {
+                        historyModal.classList.remove('show');
+                        historyModal.style.visibility = 'hidden';
+                    }
+                });
+
+                // Sil butonuna tıklama
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Event bubbling'i engelle
+                    if (confirm('Bu sohbeti silmek istediğinizden emin misiniz?')) {
+                        deleteConversation(conv.id);
+                    }
+                });
+
+                // Tüm karta tıklama (Devam Et ile aynı işlev)
+                historyItem.addEventListener('click', function() {
+                    const conversationId = this.dataset.id;
+                    loadConversation(conversationId);
+                    // Modalı kapat
+                    const historyModal = document.querySelector('.history-modal');
+                    if (historyModal) {
+                        historyModal.classList.remove('show');
+                        historyModal.style.visibility = 'hidden';
+                    }
+                });
+
+                historyList.appendChild(historyItem);
+            });
+        }
+
+        // Event listener'ları ekle
+        if (mainHistoryBtn) {
+            mainHistoryBtn.addEventListener('click', function() {
+                updateHistoryModal();
+                if (historyModal) {
+                    historyModal.classList.add('show');
+                    historyModal.style.visibility = 'visible';
+                }
+            });
+        }
+
+        if (profileMenuHistoryBtn) {
+            profileMenuHistoryBtn.addEventListener('click', function() {
+                updateHistoryModal();
+                if (historyModal) {
+                    historyModal.classList.add('show');
+                    historyModal.style.visibility = 'visible';
+                }
+                if (profileMenu) {
+                    profileMenu.classList.remove('show');
+                }
+            });
+        }
+
+        // Sohbet listesi değişikliklerini dinle
+        document.addEventListener('conversationLoaded', updateHistoryModal);
+        document.addEventListener('conversationCreated', updateHistoryModal);
+        document.addEventListener('conversationDeleted', updateHistoryModal);
+
+        // Geçmiş modalı kapatma butonu
+        const closeHistoryBtn = document.querySelector('.close-history');
+        if (closeHistoryBtn && historyModal) {
+            closeHistoryBtn.addEventListener('click', function() {
+                historyModal.classList.remove('show');
+                historyModal.style.visibility = 'hidden';
+            });
+        }
+
+        // Geçmiş modalı dışına tıklama
+        document.addEventListener('click', function(event) {
+            if (historyModal && historyModal.classList.contains('show') &&
+                !historyModal.contains(event.target) &&
+                !mainHistoryBtn.contains(event.target) &&
+                !profileMenuHistoryBtn.contains(event.target)) {
+                historyModal.classList.remove('show');
+                historyModal.style.visibility = 'hidden';
+            }
+        });
+
+        // Arama işlevselliği
+        const searchInput = document.querySelector('.history-search input');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                const historyItems = document.querySelectorAll('.history-item');
+                
+                historyItems.forEach(item => {
+                    const title = item.querySelector('h4').textContent.toLowerCase();
+                    const preview = item.querySelector('.history-preview').textContent.toLowerCase();
+                    
+                    if (title.includes(searchTerm) || preview.includes(searchTerm)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    }
+
+    // Geçmiş işlevselliğini başlat
+    setupHistoryFunctionality();
+
+    // Tema ayarlarını kaydet
+    function saveThemeSettings(theme) {
+        if (window.toggleTheme) {
+            window.toggleTheme(theme);
+        } else {
+            console.error("toggleTheme function not found");
+        }
+    }
+
+    // Sidebar toggle işlevi
+    function setupSidebarToggle() {
+        const sidebarToggleCheckbox = document.getElementById('sidebar-toggle-checkbox');
+        const sidebar = document.querySelector('.sidebar');
+        
+        // Önceki durumu localStorage'dan al
+        const sidebarState = localStorage.getItem('sidebarState');
+        if (sidebarState === 'collapsed') {
+            sidebar.classList.add('collapsed');
+            if (sidebarToggleCheckbox) {
+                sidebarToggleCheckbox.checked = true;
+            }
+        }
+        
+        // Menü toggle butonu (mobil görünüm için)
+        const menuToggle = document.querySelector('.menu-toggle');
+        if (menuToggle) {
+            menuToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('show');
+            });
+        }
+        
+        // Dışarı tıklandığında mobil menüyü kapat
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && 
+                sidebar.classList.contains('show') && 
+                !sidebar.contains(e.target) && 
+                !menuToggle.contains(e.target)) {
+                sidebar.classList.remove('show');
+            }
+        });
+        
+        // Toggle checkbox değiştiğinde durumu kaydet
+        if (sidebarToggleCheckbox) {
+            sidebarToggleCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    localStorage.setItem('sidebarState', 'collapsed');
+                } else {
+                    localStorage.setItem('sidebarState', 'expanded');
+                }
+            });
+        }
+    }
 });
 
 // Toast bildirimi fonksiyonunu global yap
@@ -1568,6 +1728,3 @@ window.showToast = function (message, type = 'info') {
         toast.remove();
     }, 3000);
 };
-
-// sendMessage fonksiyonunu global yap (ses bildirimlerinde kullanım için)
-window.sendMessage = sendMessage;

@@ -5,15 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turna AI Chat</title>
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="app-container">
+        <input type="checkbox" id="sidebar-toggle-checkbox" class="sidebar-toggle-checkbox">
+    
+        <!-- Toggle butonu sidebar'ın dışında olmalı -->
+        <label for="sidebar-toggle-checkbox" class="sidebar-toggle" title="Sidebar'ı Aç/Kapat">
+            <i class="fas fa-chevron-left"></i>
+        </label>
         <!-- Sol Panel -->
         <div class="sidebar">
             <div class="sidebar-header">
                 <img src="/static/turna-logo.svg" alt="Turna AI" class="logo">
                 <h2>Turna AI</h2>
+            </div>
+            
+            <!-- Model Seçimi -->
+            <div class="model-selector">
+                <div class="mode-label">Model</div>
+                <div class="model-options">
+                    <button class="model-btn active" data-model="turnaV1">
+                        <i class="fas fa-robot"></i> TurnaV1
+                    </button>
+                    <button class="model-btn" data-model="gemini">
+                        <i class="fas fa-gem"></i> Gemini
+                    </button>
+                </div>
             </div>
             
             <button class="new-chat-btn">
@@ -38,7 +57,6 @@
             
             <div class="conversations-list">
                 <!-- Geçmiş sohbetler burada listelenecek -->
-                <!-- Bu öğe script.js tarafından dinamik olarak doldurulacak -->
             </div>
             
             <div class="sidebar-footer">
@@ -61,10 +79,7 @@
                 <div class="menu-toggle">
                     <i class="fas fa-bars"></i>
                 </div>
-                <div class="conversation-title"
-     contenteditable="plaintext-only"
-     spellcheck="false">Yeni Sohbet</div>
-
+                <div class="conversation-title">Yeni Sohbet</div>
                 <div class="top-actions">
                     <button id="export-btn" title="Sohbeti Dışa Aktar">
                         <i class="fas fa-download"></i>
@@ -80,23 +95,7 @@
             <!-- Sohbet Alanı -->
             <div class="chat-container">
                 <div id="chat-messages">
-                    <div class="message bot">
-                        <div class="message-content">
-                            <p>Turna AI Chat'e hoş geldiniz! Size nasıl yardımcı olabilirim?</p>
-                            <p>İşte yapabileceğim bazı şeyler:</p>
-                            <ul>
-                                <li>Sorularınızı yanıtlayabilirim</li>
-                                <li>Yaratıcı içerik oluşturabilirim</li>
-                                <li>Metinleri düzenleyebilirim</li>
-                                <li>Kodlama yardımı sunabilirim</li>
-                            </ul>
-                        </div>
-                        <div class="message-actions">
-                            <button class="copy-btn" title="Kopyala"><i class="fas fa-copy"></i></button>
-                            <button class="thumbs-up-btn" title="Beğen"><i class="fas fa-thumbs-up"></i></button>
-                            <button class="thumbs-down-btn" title="Beğenme"><i class="fas fa-thumbs-down"></i></button>
-                        </div>
-                    </div>
+                    <!-- Karşılama mesajı ve örnekler kaldırıldı -->
                 </div>
                 
                 <div class="suggestion-chips">
@@ -109,12 +108,6 @@
                 <div class="input-area">
                     <div class="input-container">
                         <textarea id="user-input" placeholder="Bir şeyler sorun..."></textarea>
-                        <button id="mic-btn" title="Sesli Giriş">
-                            <i class="fas fa-microphone"></i>
-                        </button>
-                        <button id="attach-btn" title="Dosya Ekle">
-                            <i class="fas fa-paperclip"></i>
-                        </button>
                     </div>
                     <div class="input-buttons">
                         <button id="clear-btn" title="Temizle">
@@ -128,7 +121,7 @@
             </div>
         </div>
         
-        <!-- Kullanıcı Profil Menüsü (varsayılan olarak gizli) -->
+        <!-- Kullanıcı Profil Menüsü -->
         <div class="profile-menu">
             <div class="profile-header">
                 <img src="/static/user-avatar.svg" alt="User" class="user-avatar-large">
@@ -142,7 +135,7 @@
                 <a href="#" class="profile-option" id="history-link"><i class="fas fa-history"></i> Geçmiş</a>
                 <a href="#" class="profile-option" id="preferences-link"><i class="fas fa-sliders-h"></i> Tercihler</a>
                 <a href="#" class="profile-option" id="help-link"><i class="fas fa-question-circle"></i> Yardım</a>
-                <a href="#" class="profile-option" id="logout-link"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a>
+                <a href="#" class="profile-option" id="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Çıkış Yap</span></a>
             </div>
         </div>
         
@@ -156,87 +149,57 @@
                 <div class="settings-section">
                     <h4>Genel</h4>
                     <div class="setting-item">
-                        <label>Dil</label>
-                        <select id="language-select">
+                        <label><i class="fas fa-globe"></i> Dil</label>
+                        <select id="language-select" class="styled-select">
                             <option value="tr" selected>Türkçe</option>
                             <option value="en">English</option>
                             <option value="de">Deutsch</option>
                             <option value="fr">Français</option>
                         </select>
                     </div>
-                    <div class="setting-item">
-                        <label>Otomatik kaydırma</label>
-                        <label class="switch">
-                            <input type="checkbox" id="auto-scroll-toggle" checked>
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
                 </div>
                 <div class="settings-section">
                     <h4>Görünüm</h4>
                     <div class="setting-item">
-                        <label>Yazı boyutu</label>
-                        <select id="font-size-select">
+                        <label><i class="fas fa-text-height"></i> Yazı boyutu</label>
+                        <select id="font-size-select" class="styled-select">
                             <option value="small">Küçük</option>
                             <option value="medium" selected>Orta</option>
                             <option value="large">Büyük</option>
                         </select>
                     </div>
                     <div class="setting-item">
-                        <label>Tema</label>
+                        <label><i class="fas fa-palette"></i> Tema</label>
                         <div class="theme-options">
-                            <button class="theme-option" data-theme="dark">Koyu</button>
-                            <button class="theme-option" data-theme="light">Açık</button>
-                            <button class="theme-option active" data-theme="purple">Mor</button>
+                            <button class="theme-option" data-theme="turquoise" style="display: none;">
+                                <i class="fas fa-water"></i>
+                                Turkuaz
+                            </button>
+                            <button class="theme-option" data-theme="light">
+                                <i class="fas fa-sun"></i>
+                                Açık
+                            </button>
+                            <button class="theme-option active" data-theme="purple">
+                                <i class="fas fa-moon"></i>
+                                Mor
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="settings-section">
+                <div class="settings-section" style="display: none;">
                     <h4>Bildirimler</h4>
                     <div class="setting-item">
-                        <label>Ses bildirimleri</label>
+                        <label>Bildirimler</label>
                         <label class="switch">
-                            <input type="checkbox" id="sound-notification-toggle" checked>
-                            <span class="slider round"></span>
+                            <input type="checkbox" id="notifications-toggle">
+                            <span class="slider"></span>
                         </label>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Dosya Ekleme Modal (varsayılan olarak gizli) -->
-        <div class="modal" id="file-modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Dosya Ekle</h3>
-                    <button class="close-modal"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="modal-body">
-                    <div class="upload-area">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>Dosyalarınızı buraya sürükleyin veya</p>
-                        <button class="browse-btn">Dosya Seçin</button>
-                        <input type="file" id="file-input" style="display: none;">
-                    </div>
-                    <div class="file-list-area">
-                        <h4>Desteklenen Dosya Türleri</h4>
-                        <ul class="file-types">
-                            <li><i class="fas fa-file-pdf"></i> PDF dosyaları</li>
-                            <li><i class="fas fa-file-word"></i> Word dosyaları</li>
-                            <li><i class="fas fa-file-csv"></i> Excel dosyaları</li>
-                            <li><i class="fas fa-file-image"></i> Görsel dosyaları</li>
-                            <li><i class="fas fa-file-code"></i> Kod dosyaları</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="cancel-btn">İptal</button>
-                    <button class="upload-btn" disabled>Yükle</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Geri Bildirim Modal (varsayılan olarak gizli) -->
+        <!-- Geri Bildirim Modal -->
         <div class="modal" id="feedback-modal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -266,7 +229,7 @@
             </div>
         </div>
         
-        <!-- index.html dosyasına eklenecek - login/signup modal -->
+        <!-- Login/Register Modal -->
         <div class="modal" id="auth-modal">
             <div class="modal-content auth-modal-content">
                 <div class="modal-header">
@@ -279,83 +242,75 @@
                 </div>
                 
                 <div class="auth-form-container">
-<!-- Giriş Formu -->
-<form id="login-form" class="auth-form active">
-    <div class="form-group">
-        <label for="email">E-posta</label>
-        <input type="email" id="email" required>
-    </div>
-    <div class="form-group">
-        <label for="password">Şifre</label>
-        <div class="password-input">
-            <input type="password" id="password" required>
-            <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
-        </div>
-    </div>
-    <div class="form-options">
-        <label class="checkbox-container">
-            <input type="checkbox" id="remember-me">
-            <span class="checkmark"></span>
-            Beni hatırla
-        </label>
-        <a href="#" class="forgot-password">Şifremi unuttum</a>
-    </div>
-    <button type="submit" id="login-btn" class="auth-submit-btn">Giriş Yap</button>
-</form>
+                    <!-- Giriş Formu -->
+                    <form id="login-form" class="auth-form active">
+                        <div class="form-group">
+                            <label for="email">E-posta</label>
+                            <input type="email" id="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Şifre</label>
+                            <div class="password-input">
+                                <input type="password" id="password" required>
+                                <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-options">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="remember-me">
+                                <span class="checkmark"></span>
+                                Beni hatırla
+                            </label>
+                            <a href="#" class="forgot-password">Şifremi unuttum</a>
+                        </div>
+                        <button type="submit" id="login-btn" class="auth-submit-btn">Giriş Yap</button>
+                    </form>
 
-<!-- Kayıt Formu -->
-<form id="register-form" class="auth-form">
-    <div class="form-group">
-        <label for="name">Ad Soyad</label>
-        <input type="text" id="name" required>
-    </div>
-    <div class="form-group">
-        <label for="register-email">E-posta</label>
-        <input type="email" id="register-email" required>
-    </div>
-    <div class="form-group">
-        <label for="register-password">Şifre</label>
-        <div class="password-input">
-            <input type="password" id="register-password" required>
-            <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
-        </div>
-    </div>
-    <div class="form-group">
-        <label for="confirm-password">Şifre Tekrar</label>
-        <div class="password-input">
-            <input type="password" id="confirm-password" required>
-            <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
-        </div>
-    </div>
-    <div class="form-options">
-        <label class="checkbox-container">
-            <input type="checkbox" id="terms-agree" required>
-            <span class="checkmark"></span>
-            <a href="#" class="terms-link">Kullanım şartlarını</a> kabul ediyorum
-        </label>
-    </div>
-    <button type="submit" id="register-btn" class="auth-submit-btn">Kayıt Ol</button>
-</form>
+                    <!-- Kayıt Formu -->
+                    <form id="register-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="name">Ad Soyad</label>
+                            <input type="text" id="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-email">E-posta</label>
+                            <input type="email" id="register-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">Şifre</label>
+                            <div class="password-input">
+                                <input type="password" id="register-password" required>
+                                <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Şifre Tekrar</label>
+                            <div class="password-input">
+                                <input type="password" id="confirm-password" required>
+                                <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-options">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="terms-agree" required>
+                                <span class="checkmark"></span>
+                                <a href="#" class="terms-link">Kullanım şartlarını</a> kabul ediyorum
+                            </label>
+                        </div>
+                        <button type="submit" id="register-btn" class="auth-submit-btn">Kayıt Ol</button>
+                    </form>
+                </div>
                 
                 <div class="auth-separator">
                     <span>veya</span>
                 </div>
                 
                 <div class="social-login">
-                    <button class="social-btn google-btn">
-                        <i class="fab fa-google"></i>
-                        Google ile devam et
-                    </button>
-                    <button class="social-btn facebook-btn">
-                        <i class="fab fa-facebook-f"></i>
-                        Facebook ile devam et
+                    <button class="guest-login-btn">
+                        <i class="fas fa-user-secret"></i>
+                        Misafir olarak devam et
                     </button>
                 </div>
-                
-                <button class="guest-login-btn">
-                    <i class="fas fa-user-secret"></i>
-                    Misafir olarak devam et
-                </button>
             </div>
         </div>
 
@@ -401,13 +356,6 @@
                         <div class="search-container">
                             <input type="text" placeholder="Geçmiş sohbetlerde ara...">
                             <button class="search-btn"><i class="fas fa-search"></i></button>
-                        </div>
-                        <div class="history-filter">
-                            <label for="history-sort">Sırala:</label>
-                            <select id="history-sort">
-                                <option value="newest">En yeni</option>
-                                <option value="oldest">En eski</option>
-                            </select>
                         </div>
                     </div>
                     <div class="history-list">
@@ -468,7 +416,7 @@
                             <label for="pref-theme">Tema</label>
                             <div class="theme-options">
                                 <button class="theme-option active" data-theme="purple">Mor</button>
-                                <button class="theme-option" data-theme="dark">Koyu</button>
+                                <button class="theme-option" data-theme="turquoise" style="display: none;">Turkuaz</button>
                                 <button class="theme-option" data-theme="light">Açık</button>
                             </div>
                         </div>
@@ -490,8 +438,8 @@
                             </select>
                         </div>
                     </div>
-                    <div class="preferences-section">
-                        <h4>Bildirim Ayarları</h4>
+                    <div class="preferences-section" style="display: none;">
+                        <h4>Bildirimler</h4>
                         <div class="preference-item">
                             <label>Sesli Bildirimler</label>
                             <label class="switch">
@@ -499,32 +447,7 @@
                                 <span class="slider round"></span>
                             </label>
                         </div>
-                        <div class="preference-item">
-                            <label>E-posta Bildirimleri</label>
-                            <label class="switch">
-                                <input type="checkbox" id="pref-email-notifications">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
                     </div>
-                    <div class="preferences-section">
-                        <h4>Gizlilik Ayarları</h4>
-                        <div class="preference-item">
-                            <label>Sohbet Geçmişini Kaydet</label>
-                            <label class="switch">
-                                <input type="checkbox" id="pref-save-history" checked>
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <div class="preference-item">
-                            <label>Kullanım İstatistiklerini Paylaş</label>
-                            <label class="switch">
-                                <input type="checkbox" id="pref-usage-stats" checked>
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                    </div>
-                    <button class="preferences-save-btn">Değişiklikleri Kaydet</button>
                 </div>
             </div>
             
@@ -544,7 +467,6 @@
                     <div class="help-tabs">
                         <button class="help-tab active" data-tab="faqs">Sık Sorulan Sorular</button>
                         <button class="help-tab" data-tab="guides">Kullanım Kılavuzu</button>
-                        <button class="help-tab" data-tab="contact">İletişim</button>
                     </div>
                     
                     <!-- SSS İçeriği -->
@@ -596,50 +518,6 @@
                         <div class="guide-item">
                             <h4>Dosya Yükleme</h4>
                             <p>Ataç simgesine tıklayarak PDF, Word, Excel ve görsel dosyaları yükleyebilir ve bu dosyalar hakkında sorular sorabilirsiniz.</p>
-                        </div>
-                    </div>
-                    
-                    <!-- İletişim İçeriği -->
-                    <div class="help-content" id="contact-content">
-                        <div class="contact-form">
-                            <div class="form-group">
-                                <label for="contact-name">Adınız</label>
-                                <input type="text" id="contact-name">
-                            </div>
-                            <div class="form-group">
-                                <label for="contact-email">E-posta</label>
-                                <input type="email" id="contact-email">
-                            </div>
-                            <div class="form-group">
-                                <label for="contact-subject">Konu</label>
-                                <select id="contact-subject">
-                                    <option value="question">Soru</option>
-                                    <option value="feedback">Geri Bildirim</option>
-                                    <option value="problem">Teknik Sorun</option>
-                                    <option value="other">Diğer</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="contact-message">Mesajınız</label>
-                                <textarea id="contact-message" rows="4"></textarea>
-                            </div>
-                            <button type="submit" class="contact-submit-btn">Gönder</button>
-                        </div>
-                        <div class="contact-info">
-                            <div class="contact-method">
-                                <i class="fas fa-envelope"></i>
-                                <span>destek@turnaai.com</span>
-                            </div>
-                            <div class="contact-method">
-                                <i class="fas fa-phone-alt"></i>
-                                <span>+90 212 123 4567</span>
-                            </div>
-                            <div class="contact-social">
-                                <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
-                                <a href="#" class="social-link"><i class="fab fa-facebook"></i></a>
-                                <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
-                                <a href="#" class="social-link"><i class="fab fa-linkedin"></i></a>
-                            </div>
                         </div>
                     </div>
                 </div>

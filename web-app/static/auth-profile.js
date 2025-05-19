@@ -1,3 +1,4 @@
+// auth-profile.js - Sıfırdan yazılmış çalışan versiyon
 document.addEventListener('DOMContentLoaded', function () {
     // DOM elementlerini seç
     const authModal = document.getElementById('auth-modal');
@@ -14,6 +15,49 @@ document.addEventListener('DOMContentLoaded', function () {
     const profileCards = document.querySelectorAll('.profile-card');
     const closeProfileCardBtns = document.querySelectorAll('.close-profile-card');
     const guestLoginBtn = document.querySelector('.guest-login-btn');
+
+    // CSS stillerini doğrudan ekle
+    // CSS stillerini doğrudan ekle
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+    .profile-card-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        z-index: 9999 !important;
+        display: none !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    
+    .profile-card-overlay.visible {
+        display: flex !important;
+    }
+    
+    .profile-card {
+        display: none !important;
+        position: fixed !important; /* relative yerine fixed */
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        background-color: var(--dark-gray) !important;
+        width: 90% !important;
+        max-width: 500px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3) !important;
+        z-index: 10000 !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+    }
+    
+    .profile-card.visible {
+        display: block !important;
+    }
+`;
+    document.head.appendChild(styleElement);
 
     // Veritabanı bağlantı durumunu kontrol et
     async function checkDatabaseConnection() {
@@ -98,34 +142,69 @@ document.addEventListener('DOMContentLoaded', function () {
         authModal.classList.remove('show');
     }
 
-    // Profil kartlarını gösterme fonksiyonu
     function showProfileCard(cardId) {
+        console.log('showProfileCard çağrıldı:', cardId);
+
+        // Önce overlay'i göster
         profileCardOverlay.style.display = 'flex';
+        profileCardOverlay.style.opacity = '0';
+        profileCardOverlay.classList.add('visible');
+
+        // Animasyon için küçük bir gecikme
+        setTimeout(() => {
+            profileCardOverlay.style.opacity = '1';
+        }, 10);
 
         // Tüm kartları gizle
         profileCards.forEach(card => {
             card.style.display = 'none';
+            card.classList.remove('visible');
         });
 
         // İstenen kartı göster
         const card = document.getElementById(cardId);
         if (card) {
             card.style.display = 'block';
+            card.classList.add('visible');
+            console.log('Kart gösteriliyor:', cardId);
+        } else {
+            console.error('Kart bulunamadı:', cardId);
         }
     }
 
-    // Profil kartlarını gizleme fonksiyonu
     function hideProfileCards() {
-        profileCardOverlay.style.display = 'none';
+        console.log('hideProfileCards çağrıldı');
+
+        // Animasyonlu kapanma
+        profileCardOverlay.style.opacity = '0';
+
+        setTimeout(() => {
+            // Overlay'i gizle
+            profileCardOverlay.style.display = 'none';
+            profileCardOverlay.classList.remove('visible');
+
+            // Tüm kartları gizle
+            profileCards.forEach(card => {
+                card.style.display = 'none';
+                card.classList.remove('visible');
+            });
+        }, 300);
     }
 
     // Profil linki tıklama olayı
     if (profileLink) {
         profileLink.addEventListener('click', function (e) {
             e.preventDefault();
+            console.log('Profil linkine tıklandı');
+
+            // Menüyü kapat
+            const profileMenu = document.querySelector('.profile-menu');
+            if (profileMenu) {
+                profileMenu.classList.remove('show');
+            }
+
+            // Profil kartını göster
             showProfileCard('profile-card');
-            // Profil menüsünü kapat
-            document.querySelector('.profile-menu').classList.remove('show');
         });
     }
 
@@ -133,9 +212,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (historyLink) {
         historyLink.addEventListener('click', function (e) {
             e.preventDefault();
+            console.log('Geçmiş linkine tıklandı');
+
+            // Menüyü kapat
+            const profileMenu = document.querySelector('.profile-menu');
+            if (profileMenu) {
+                profileMenu.classList.remove('show');
+            }
+
+            // Geçmiş kartını göster
             showProfileCard('history-card');
-            // Profil menüsünü kapat
-            document.querySelector('.profile-menu').classList.remove('show');
         });
     }
 
@@ -143,9 +229,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (preferencesLink) {
         preferencesLink.addEventListener('click', function (e) {
             e.preventDefault();
+            console.log('Tercihler linkine tıklandı');
+
+            // Menüyü kapat
+            const profileMenu = document.querySelector('.profile-menu');
+            if (profileMenu) {
+                profileMenu.classList.remove('show');
+            }
+
+            // Tercihler kartını göster
             showProfileCard('preferences-card');
-            // Profil menüsünü kapat
-            document.querySelector('.profile-menu').classList.remove('show');
         });
     }
 
@@ -153,19 +246,31 @@ document.addEventListener('DOMContentLoaded', function () {
     if (helpLink) {
         helpLink.addEventListener('click', function (e) {
             e.preventDefault();
+            console.log('Yardım linkine tıklandı');
+
+            // Menüyü kapat
+            const profileMenu = document.querySelector('.profile-menu');
+            if (profileMenu) {
+                profileMenu.classList.remove('show');
+            }
+
+            // Yardım kartını göster
             showProfileCard('help-card');
-            // Profil menüsünü kapat
-            document.querySelector('.profile-menu').classList.remove('show');
         });
     }
 
     // Profil kartı kapatma butonları
     closeProfileCardBtns.forEach(btn => {
-        btn.addEventListener('click', hideProfileCards);
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            console.log('Kart kapatma butonuna tıklandı');
+            hideProfileCards();
+        });
     });
 
-    // Profil kartı overlay'ine tıklama
+    // Overlay'e tıklama ile kartları kapat
     profileCardOverlay.addEventListener('click', function (e) {
+        // Sadece overlay'in kendisine tıklandığında kapat
         if (e.target === profileCardOverlay) {
             hideProfileCards();
         }
@@ -284,7 +389,18 @@ document.addEventListener('DOMContentLoaded', function () {
     if (guestLoginBtn) {
         guestLoginBtn.addEventListener('click', function () {
             hideAuthModal();
-            showToast('Misafir olarak giriş yapıldı', 'info');
+            
+            // Misafir modu için session storage'a değerleri ayarla
+            sessionStorage.setItem('isGuestMode', 'true');
+            sessionStorage.setItem('guestRemainingMessages', '5');
+            
+            // Misafir olarak giriş mesajını göster
+            showToast('Misafir olarak giriş yapıldı (5 mesaj hakkınız var)', 'info');
+            
+            // Sayfayı yenile
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         });
     }
 
@@ -292,6 +408,20 @@ document.addEventListener('DOMContentLoaded', function () {
     if (logoutLink) {
         logoutLink.addEventListener('click', async function (e) {
             e.preventDefault();
+            
+            // Misafir modu kontrolü
+            if (sessionStorage.getItem('isGuestMode') === 'true') {
+                // Misafir modunda "Çıkış Yap" butonuna tıklanırsa, login sayfasına yönlendir
+                sessionStorage.removeItem('isGuestMode');
+                sessionStorage.removeItem('guestRemainingMessages');
+                showToast('Giriş sayfasına yönlendiriliyorsunuz', 'info');
+                
+                // Auth modalını göster
+                setTimeout(() => {
+                    showAuthModal();
+                }, 1000);
+                return;
+            }
 
             try {
                 const response = await fetch('/api/logout', {
@@ -319,6 +449,82 @@ document.addEventListener('DOMContentLoaded', function () {
     // Kullanıcı kimlik doğrulama durumunu kontrol et
     async function checkAuthStatus() {
         try {
+            // Misafir modu kontrolü
+            if (sessionStorage.getItem('isGuestMode') === 'true') {
+                console.log('Misafir modu aktif');
+                // Logout butonunu 'Giriş Yap' olarak güncelle
+                const logoutLink = document.getElementById('logout-link');
+                if (logoutLink) {
+                    const logoutText = logoutLink.querySelector('span');
+                    if (logoutText) {
+                        logoutText.textContent = 'Giriş Yap';
+                    }
+                }
+                // Profil, Geçmiş, Tercihler butonlarını devre dışı bırak
+                ['profile-link', 'history-link', 'preferences-link'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.classList.add('disabled');
+                        el.style.pointerEvents = 'none';
+                        el.style.opacity = '0.5';
+                    }
+                });
+                // Yardım ve Giriş Yap aktif kalsın
+                const helpLink = document.getElementById('help-link');
+                if (helpLink) {
+                    helpLink.classList.remove('disabled');
+                    helpLink.style.pointerEvents = '';
+                    helpLink.style.opacity = '';
+                }
+                if (logoutLink) {
+                    logoutLink.classList.remove('disabled');
+                    logoutLink.style.pointerEvents = '';
+                    logoutLink.style.opacity = '';
+                }
+                // Başlık çubuğuna kalan mesaj sayısını ekle
+                if (typeof window.updateRemainingMessagesDisplay === 'function') {
+                    window.updateRemainingMessagesDisplay();
+                } else {
+                    updateRemainingMessagesDisplay();
+                }
+                // Yeni Sohbet butonunu devre dışı bırak
+                const newChatBtn = document.querySelector('.new-chat-btn');
+                if (newChatBtn) {
+                    newChatBtn.classList.add('disabled');
+                    newChatBtn.disabled = true;
+                    newChatBtn.style.pointerEvents = 'none';
+                    newChatBtn.style.opacity = '0.5';
+                }
+                // Ayarlar butonunu devre dışı bırak
+                const settingsBtn = document.querySelector('.settings-btn');
+                if (settingsBtn) {
+                    settingsBtn.classList.add('disabled');
+                    settingsBtn.disabled = true;
+                    settingsBtn.style.pointerEvents = 'none';
+                    settingsBtn.style.opacity = '0.5';
+                }
+                // Çöp kutusu (temizle) butonunu devre dışı bırak
+                const clearBtn = document.getElementById('clear-btn');
+                if (clearBtn) {
+                    clearBtn.classList.add('disabled');
+                    clearBtn.disabled = true;
+                    clearBtn.style.pointerEvents = 'none';
+                    clearBtn.style.opacity = '0.5';
+                }
+                
+                // Mikrofon ve doküman yükleme butonlarını tamamen kaldır
+                document.querySelectorAll('#mic-btn, #attach-btn').forEach(btn => {
+                    if (btn) btn.style.display = 'none';
+                });
+                
+                // Başlığı güncelle
+                if (typeof window.updateGuestConversationTitle === 'function') {
+                    window.updateGuestConversationTitle();
+                }
+                
+                return true;
+            }
+            
             const response = await fetch('/api/user');
 
             if (response.ok) {
@@ -334,6 +540,52 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Kimlik doğrulama kontrolü hatası:', error);
             return false;
+        }
+    }
+
+    // Kalan mesaj sayısını gösteren fonksiyon
+    function updateRemainingMessagesDisplay() {
+        // Eğer varsa eski mesaj sayacını kaldır
+        const existingCounter = document.getElementById('guest-message-counter');
+        if (existingCounter) {
+            existingCounter.remove();
+        }
+        
+        // Misafir modu kontrolü
+        if (sessionStorage.getItem('isGuestMode') === 'true') {
+            // Kalan mesaj sayısını al
+            const remainingMessages = sessionStorage.getItem('guestRemainingMessages') || '5';
+            
+            // Sağ üst köşeye sayacı ekle
+            const counter = document.createElement('div');
+            counter.id = 'guest-message-counter';
+            counter.className = 'guest-counter';
+            counter.innerHTML = `<i class="fas fa-comment"></i> <span>${remainingMessages}</span>`;
+            
+            // CSS ekle
+            counter.style.position = 'fixed';
+            counter.style.top = '10px';
+            counter.style.right = '80px';
+            counter.style.backgroundColor = 'var(--primary-color)';
+            counter.style.color = 'white';
+            counter.style.padding = '5px 10px';
+            counter.style.borderRadius = '20px';
+            counter.style.fontSize = '14px';
+            counter.style.zIndex = '1000';
+            
+            document.body.appendChild(counter);
+
+            // Gönder butonunu kontrol et
+            const sendButton = document.getElementById('send-button');
+            if (sendButton) {
+                if (parseInt(remainingMessages) <= 0) {
+                    sendButton.disabled = true;
+                    sendButton.title = 'Mesaj hakkınız kalmadı';
+                } else {
+                    sendButton.disabled = false;
+                    sendButton.title = 'Gönder';
+                }
+            }
         }
     }
 
@@ -371,7 +623,23 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.add('active');
             const tabName = this.getAttribute('data-tab');
             const contentId = tabName + '-content';
-            document.getElementById(contentId).classList.add('active');
+            const contentElement = document.getElementById(contentId);
+            if (contentElement) {
+                contentElement.classList.add('active');
+            }
         });
     });
+
+    // Yardım/İletişim formu mailto ile gönderilsin
+    const contactForm = document.querySelector('.contact-form');
+    if (contactForm) {
+        contactForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            window.location.href = 'mailto:canobingol2@gmail.com';
+        });
+    }
+
+    // Global erişim için fonksiyonları window objesine ekle
+    window.showAuthModal = showAuthModal;
+    window.updateRemainingMessagesDisplay = updateRemainingMessagesDisplay;
 });
